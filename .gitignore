@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+
+# 轉檔後的模型很大，不進版控
+models/
+
+# 原始錄音絕不進版控（隱私核心論述）
+*.wav

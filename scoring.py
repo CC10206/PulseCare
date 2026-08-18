@@ -6,9 +6,10 @@ PulseCare — 個人化基線與語音活力指數 (Phase 1)
   2. 計分公式完全透明可稽核 —— 心理師能看懂、能調參數。
   3. 用 median/MAD 而非 mean/std：對離群值穩健 (感冒、訪客、電視聲)。
 """
+import datetime
 import json
 import numpy as np
-from features import FEATURE_KEYS
+from feature_keys import FEATURE_KEYS
 
 # +1 = 數值越高代表越有活力；-1 = 越高代表越低落
 DIRECTION = {
@@ -60,6 +61,20 @@ def alert_level(recent: list[float], threshold: float = 38.0,
         return "calibrating"
     n_low = sum(1 for v in w if v < threshold)
     return "yellow" if n_low >= low_days else "green"
+
+
+def build_report(idx: float, contribs: dict, level: str, trend: list[float],
+                  elder_name: str = "長者", date: str | None = None) -> dict:
+    """組成給家屬/社工 App 畫面用的結構化報告 (見 analyze.py --json)。"""
+    return {
+        "elder_name": elder_name,
+        "date": date or datetime.date.today().isoformat(),
+        "index": idx,
+        "level": level,
+        "trend": trend,
+        "explain": explain(contribs),
+        "disclaimer": "本指數為相對於個人基線的偏離程度，非臨床診斷工具。",
+    }
 
 
 def explain(contribs: dict, top_n: int = 3) -> list[str]:

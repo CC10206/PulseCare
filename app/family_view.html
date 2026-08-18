@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PulseCare 家屬通知</title>
+<style>
+  :root {
+    --bg-outer: #e7e9ee;
+    --frame-bg: #ffffff;
+    --text-main: #1c1e21;
+    --text-muted: #767b83;
+    --card-bg: #f5f6f8;
+    --green: #2fb672;
+    --green-bg: #e6f7ee;
+    --yellow: #d9a220;
+    --yellow-bg: #fbf1dc;
+    --divider: #e6e7ea;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: var(--bg-outer);
+    font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    color: var(--text-main);
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .phone {
+    width: 390px;
+    height: 844px;
+    background: var(--frame-bg);
+    border-radius: 44px;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.25), 0 0 0 10px #111 inset;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .statusbar {
+    height: 46px;
+    flex: none;
+  }
+
+  .topbar {
+    padding: 4px 24px 16px;
+    font-size: 20px;
+    font-weight: 600;
+    flex: none;
+  }
+
+  .content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 20px 32px;
+  }
+
+  .status-card {
+    border-radius: 20px;
+    padding: 24px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .status-card.level-green { background: var(--green-bg); }
+  .status-card.level-yellow { background: var(--yellow-bg); }
+
+  .dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex: none;
+  }
+  .level-green .dot { background: var(--green); box-shadow: 0 0 0 6px rgba(47,182,114,0.15); }
+  .level-yellow .dot { background: var(--yellow); box-shadow: 0 0 0 6px rgba(217,162,32,0.18); }
+
+  .status-text .name { font-size: 14px; color: var(--text-muted); margin-bottom: 2px; }
+  .status-text .title { font-size: 19px; font-weight: 700; }
+  .level-green .title { color: var(--green); }
+  .level-yellow .title { color: var(--yellow); }
+
+  .message {
+    font-size: 16px;
+    line-height: 1.6;
+    padding: 0 2px;
+    margin-bottom: 28px;
+  }
+
+  .section-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin: 0 0 10px 2px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+
+  .trend-card {
+    background: var(--card-bg);
+    border-radius: 18px;
+    padding: 18px 18px 14px;
+    margin-bottom: 24px;
+  }
+
+  .trend-card svg { width: 100%; height: 90px; display: block; }
+  .trend-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 6px;
+  }
+
+  .explain-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 24px;
+  }
+  .explain-list li {
+    font-size: 13px;
+    color: var(--text-muted);
+    padding: 8px 2px;
+    border-bottom: 1px solid var(--divider);
+  }
+  .explain-list li:last-child { border-bottom: none; }
+  .explain-empty { font-size: 13px; color: var(--text-muted); padding: 4px 2px 24px; }
+
+  .disclaimer {
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    padding-top: 8px;
+    border-top: 1px solid var(--divider);
+  }
+
+  .loading, .error {
+    padding: 40px 24px;
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+  .error { color: #b5433a; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+  <div class="statusbar"></div>
+  <div class="topbar">PulseCare 家屬通知</div>
+  <div class="content" id="content">
+    <div class="loading">載入中…</div>
+  </div>
+</div>
+
+<script>
+const LEVEL_COPY = {
+  green: {
+    title: "今天一切安好",
+    message: (name) => `${name} 語音活力與平常一樣穩定，不用擔心。`,
+  },
+  yellow: {
+    title: "最近活力較少",
+    message: (name) => `${name} 最近的語音活力比平常低一些，有空的話不妨打通電話問候，或回家看看他。`,
+  },
+  calibrating: {
+    title: "系統學習中",
+    message: (name) => `系統正在熟悉 ${name} 的日常語音模式，還需要幾天才能開始提醒。`,
+  },
+};
+
+function levelCopy(level) {
+  return LEVEL_COPY[level] || {
+    title: "狀態未知",
+    message: (name) => `目前無法判讀 ${name} 的語音活力狀態。`,
+  };
+}
+
+function buildTrendSvg(trend) {
+  const w = 320, h = 90, pad = 8;
+  const lo = 0, hi = 100;
+  const n = trend.length;
+  const x = (i) => pad + (i / Math.max(n - 1, 1)) * (w - pad * 2);
+  const y = (v) => h - pad - ((v - lo) / (hi - lo)) * (h - pad * 2);
+
+  const points = trend.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const lastX = x(n - 1), lastY = y(trend[n - 1]);
+
+  return `
+    <svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+      <polyline points="${points}" fill="none" stroke="currentColor" stroke-width="3"
+                stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+      <circle cx="${lastX}" cy="${lastY}" r="5" fill="currentColor" />
+    </svg>`;
+}
+
+function render(report) {
+  const copy = levelCopy(report.level);
+  const el = document.getElementById("content");
+
+  const explainHtml = (report.explain && report.explain.length)
+    ? `<ul class="explain-list">${report.explain.map(line => `<li>${line}</li>`).join("")}</ul>`
+    : `<div class="explain-empty">目前沒有明顯偏離的項目。</div>`;
+
+  el.innerHTML = `
+    <div class="status-card level-${report.level}">
+      <div class="dot"></div>
+      <div class="status-text">
+        <div class="name">${report.elder_name}・${report.date}</div>
+        <div class="title">${copy.title}</div>
+      </div>
+    </div>
+
+    <div class="message">${copy.message(report.elder_name)}</div>
+
+    <div class="section-label">近 7 日語音活力趨勢</div>
+    <div class="trend-card level-${report.level}" style="color:${report.level === 'yellow' ? 'var(--yellow)' : 'var(--green)'}">
+      ${buildTrendSvg(report.trend)}
+      <div class="trend-labels"><span>7 天前</span><span>今天</span></div>
+    </div>
+
+    <div class="section-label">系統觀察到的細節</div>
+    ${explainHtml}
+
+    <div class="disclaimer">${report.disclaimer}</div>
+  `;
+}
+
+async function main() {
+  const params = new URLSearchParams(location.search);
+  const dataUrl = params.get("data") || "green_example.json";
+
+  try {
+    const res = await fetch(dataUrl);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    render(await res.json());
+  } catch (err) {
+    document.getElementById("content").innerHTML = `
+      <div class="error">
+        載入 ${dataUrl} 失敗（${err.message}）。<br><br>
+        請確認是用本地伺服器開啟這個頁面，而不是直接用 file:// 開啟，例如：<br>
+        <code>python -m http.server</code> 然後瀏覽
+        <code>http://localhost:8000/app/family_view.html?data=yellow_example.json</code>
+      </div>`;
+  }
+}
+
+main();
+</script>
+</body>
+</html>

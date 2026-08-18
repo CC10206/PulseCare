@@ -23,11 +23,41 @@ JITTER = {
 }
 
 
+def synthetic_trend(days: int, kind: str = "flat", start: float = 50.0,
+                     end: float = 30.0, noise_sd: float = 0.0,
+                     rng: np.random.Generator | None = None) -> list[float]:
+    """產生一段合成的每日活力指數序列，供 Demo 影片的「7日趨勢」畫面使用。
+
+    kind="flat" 保留舊行為 (每天都是 start)；kind="down"/"up" 從 start
+    線性趨向 end，讓黃燈畫面的下滑趨勢是接上真實 alert_level() 邏輯算出來的，
+    而不是純視覺上的假象。
+    """
+    if kind == "flat":
+        base = np.full(days, start, dtype=float)
+    elif kind == "down":
+        base = np.linspace(start, end, days)
+    elif kind == "up":
+        base = np.linspace(end, start, days)
+    else:
+        raise ValueError(f"未知的 trend kind: {kind!r} (可用 flat/down/up)")
+
+    if noise_sd > 0:
+        if rng is None:
+            rng = np.random.default_rng()
+        base = base + rng.normal(0, noise_sd, days)
+
+    return [round(float(v), 2) for v in np.clip(base, 0, 100)]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--from-wav", help="以這段真實錄音的特徵為中心產生基線")
     ap.add_argument("--days", type=int, default=14)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--trend", choices=["flat", "down", "up"], default="flat",
+                    help="_index 欄位的示意趨勢，供家屬 App 畫面展示用")
+    ap.add_argument("--trend-end", type=float, default=30.0,
+                    help="trend=down/up 時的終點指數")
     ap.add_argument("-o", "--out", default="baseline.json")
     args = ap.parse_args()
 
@@ -40,10 +70,13 @@ def main():
         print("使用內建典型值為中心")
 
     rng = np.random.default_rng(args.seed)
+    indices = synthetic_trend(args.days, kind=args.trend, end=args.trend_end,
+                               noise_sd=1.5 if args.trend != "flat" else 0.0,
+                               rng=rng)
     history = []
-    for _ in range(args.days):
+    for idx in indices:
         day = {k: float(v * (1 + rng.normal(0, JITTER[k]))) for k, v in center.items()}
-        day["_index"] = 50.0
+        day["_index"] = idx
         history.append(day)
 
     with open(args.out, "w", encoding="utf-8") as f:

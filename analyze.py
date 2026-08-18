@@ -5,8 +5,10 @@ PulseCare Phase 1 CLI
     python analyze.py sample.wav                    # 只跑聲學特徵 (不需模型)
     python analyze.py sample.wav --transcribe       # 加上本地 Whisper 轉錄
     python analyze.py sample.wav --baseline base.json
+    python analyze.py sample.wav --baseline base.json --json out.json --elder-name 李奶奶
 
 Phase 1 的驗收標準：這支程式能印出 6 個特徵 + 一個活力指數。
+--json 額外輸出一份給家屬/社工 App 畫面用的結構化報告 (見 app/family_view.html)。
 """
 import argparse
 import json
@@ -14,7 +16,7 @@ import os
 import time
 
 from features import extract_features, lexical_features, FEATURE_KEYS
-from scoring import build_baseline, vitality_index, explain, alert_level
+from scoring import build_baseline, vitality_index, explain, alert_level, build_report
 
 
 def main():
@@ -26,7 +28,15 @@ def main():
     ap.add_argument("--baseline", help="歷史特徵 json (list of dict)")
     ap.add_argument("--keep-audio", action="store_true",
                     help="Demo 用：保留音檔。正式流程一律銷毀")
+    ap.add_argument("--json", metavar="PATH",
+                    help="額外輸出一份結構化報告 (給家屬/社工 App 畫面用)，"
+                         "需搭配 --baseline")
+    ap.add_argument("--elder-name", default="長者",
+                    help="--json 報告裡顯示的稱呼")
     args = ap.parse_args()
+
+    if args.json and not args.baseline:
+        ap.error("--json 需要搭配 --baseline 才能算出指數/燈號")
 
     t0 = time.time()
     out = extract_features(args.wav)
@@ -69,6 +79,13 @@ def main():
         for line in explain(contribs):
             print(f"    - {line}")
         print("\n  ※ 本指數為相對於個人基線的偏離程度，非臨床診斷工具。")
+
+        if args.json:
+            report = build_report(idx, contribs, level, recent[-7:],
+                                   elder_name=args.elder_name)
+            with open(args.json, "w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2, ensure_ascii=False)
+            print(f"\n  [app] 家屬/社工 App 報告已寫出 → {args.json}")
 
     print()
 
