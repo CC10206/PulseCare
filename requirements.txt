@@ -1,0 +1,19 @@
+# --- 核心 (Phase 1 必要) ---
+numpy>=1.26
+librosa>=0.10
+soundfile>=0.12
+opensmile>=2.5          # eGeMAPSv02 標準聲學特徵集
+praat-parselmouth>=0.4  # F0 交叉驗證
+
+# --- 本地推論 (Phase 1 步驟 3 起) ---
+openvino-genai>=2025.0
+openvino>=2025.0
+
+# --- 模型轉換 (只在轉檔時需要，可裝在另一個 venv) ---
+optimum[openvino]>=1.24
+transformers>=4.45
+
+# --- Phase 2 起 ---
+# sounddevice          # 麥克風錄音
+# silero-vad           # 語音活動偵測
+# fastapi uvicorn      # Phase 3 後端
