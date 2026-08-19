@@ -243,6 +243,8 @@ python live_session.py --baseline baseline.json --json app/live_example.json
 | `tts.py` | 本地文字轉語音 (Qwen3-TTS via OpenVINO，設置見 `docs/tts-setup.md`) |
 | `live_session.py` | Phase 2 主 CLI，真的對著麥克風跑一輪完整對話 |
 | `test_*.py` | pytest 單元測試（只測不需要硬體/模型的純邏輯部分） |
+| `docs/demo-steps.md` | Demo 影片拍攝腳本（分鏡、實測耗時與剪輯點、旁白要點、故障排除） |
+| `docs/tts-setup.md` | Qwen3-TTS 可行性驗證與轉檔步驟 |
 
 ## 重要聲明
 
