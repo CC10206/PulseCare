@@ -7,5 +7,15 @@ venv/
 # 轉檔後的模型很大，不進版控
 models/
 
+# Qwen3-TTS 原始碼 + OpenVINO 轉檔 helper：外部相依，不是我們的程式碼
+# (設置步驟見 docs/tts-setup.md)
+Qwen3-TTS/
+qwen_3_tts_helper.py
+
 # 原始錄音絕不進版控（隱私核心論述）
 *.wav
+
+# 使用者自己跑出來的個人基線/即時 App 報告，屬於執行期產物，
+# app/green_example.json、app/yellow_example.json 是刻意保留的示範資料例外
+baseline*.json
+app/live_example.json
