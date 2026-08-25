@@ -158,6 +158,40 @@ python -m http.server
 > `alert_level()` 需要滿 7 天觀察窗才會給綠／黃，不足會回 `calibrating`
 > （畫面顯示「系統學習中」）。這也是可以拍的一場——展示 14 天校準期的設計。
 
+### Scene 5b — 心理師示範頁面（`app/clinician_demo.html`）
+
+跟 Scene 5 用同一組 `normal.wav`/`low.wav`，但輸出改成心理師示範頁面要讀的
+格式（多了完整六項特徵貢獻度與逐字稿）：
+
+```bash
+cp raw/normal.wav . && python recording_analysis/analyze.py normal.wav --transcribe --baseline baseline_flat.json --json app/demo_assets/normal_report.json --elder-name 李奶奶 --keep-audio
+cp raw/low.wav .    && python recording_analysis/analyze.py low.wav    --transcribe --baseline baseline_down.json --json app/demo_assets/low_report.json  --elder-name 李奶奶 --keep-audio
+```
+
+還需要三個播放用的音檔（`python app/generate_examples.py` 產生的是純音調
+占位檔，僅供開發測試網頁用，正式錄影前務必替換成下面這些真的音檔）：
+
+```bash
+cp raw/normal.wav app/demo_assets/normal.wav
+cp raw/low.wav    app/demo_assets/low.wav
+cp <你自己錄的問候語音檔> app/demo_assets/greeting.wav
+```
+
+問候語不限定用 TTS 合成——用你自己念「李奶奶早！今天陽光很好，昨晚睡得好
+嗎？」錄的音檔也完全可以，`app/clinician_demo.html` 只是把它當一個可以播放
+的 wav 檔案，不在意來源。
+
+`app/demo_assets/` 整個資料夾都在 `.gitignore` 裡（跟其他原始音檔一樣不進
+版控），每次在新機器上要錄影前都要重新跑一次上面的指令。
+
+瀏覽（一定要走 `http://`，理由同 Scene 5）：
+
+```bash
+python -m http.server
+```
+
+http://localhost:8000/app/clinician_demo.html ，點 Start Demo 看完整流程。
+
 ### Scene 6 — Phase 2：真的對著麥克風跑一輪完整對話
 
 ```bash
