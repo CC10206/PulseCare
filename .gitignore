@@ -3,6 +3,7 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+.worktrees/
 
 # 轉檔後的模型很大，不進版控
 models/
