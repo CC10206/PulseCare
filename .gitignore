@@ -20,3 +20,7 @@ qwen_3_tts_helper.py
 # app/green_example.json、app/yellow_example.json 是刻意保留的示範資料例外
 baseline*.json
 app/live_example.json
+
+# 心理師示範頁面的本機素材（真人錄音 + 從中算出的報告），
+# 跟其他原始音檔一樣不進版控——見 docs/superpowers/specs/2026-08-25-clinician-demo-interface-design.md
+app/demo_assets/
