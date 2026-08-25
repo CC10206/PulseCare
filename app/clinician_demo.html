@@ -94,9 +94,15 @@
     position: relative; height: 8px; background: var(--border);
     border-radius: 4px; overflow: hidden;
   }
+  .bar-track::after {
+    content: ""; position: absolute; left: 50%; top: 0; bottom: 0;
+    width: 1px; background: rgba(255,255,255,0.18);
+  }
   .bar-fill { position: absolute; top: 0; bottom: 0; }
-  .bar-fill.bar-neg { right: 50%; background: var(--yellow); }
-  .bar-fill.bar-pos { left: 50%; background: var(--accent); }
+  .bar-fill.bar-neg { right: 50%; }
+  .bar-fill.bar-pos { left: 50%; }
+  .bar-fill.bar-neutral { background: var(--muted); }
+  .bar-fill.bar-warn { background: var(--yellow); }
   .bar-value { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 
   .transcript {
@@ -286,13 +292,15 @@ function renderReport(targetId, label, report) {
 
   const bars = FEATURE_ORDER.map((key) => {
     const z = (report.contribs && report.contribs[key]) || 0;
-    const pct = Math.min(Math.abs(z) / 3, 1) * 50;
-    const side = z < 0 ? "neg" : "pos";
+    const magnitude = Math.abs(z);
+    const pct = Math.min(magnitude / 3, 1) * 50;
+    const posClass = z < 0 ? "bar-neg" : "bar-pos";
+    const colorClass = magnitude < 0.8 ? "bar-neutral" : "bar-warn";
     return `
       <div class="bar-row">
         <span class="bar-label">${FEATURE_LABELS[key]}</span>
         <div class="bar-track">
-          <div class="bar-fill bar-${side}" style="width:${pct}%"></div>
+          <div class="bar-fill ${posClass} ${colorClass}" style="width:${pct}%"></div>
         </div>
         <span class="bar-value">${z.toFixed(2)}</span>
       </div>`;

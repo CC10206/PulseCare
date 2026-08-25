@@ -164,12 +164,29 @@ python -m http.server
 格式（多了完整六項特徵貢獻度與逐字稿）：
 
 ```bash
+mkdir -p app/demo_assets
 cp raw/normal.wav . && python recording_analysis/analyze.py normal.wav --transcribe --baseline baseline_flat.json --json app/demo_assets/normal_report.json --elder-name 李奶奶 --keep-audio
 cp raw/low.wav .    && python recording_analysis/analyze.py low.wav    --transcribe --baseline baseline_down.json --json app/demo_assets/low_report.json  --elder-name 李奶奶 --keep-audio
 ```
 
-還需要三個播放用的音檔（`python app/generate_examples.py` 產生的是純音調
-占位檔，僅供開發測試網頁用，正式錄影前務必替換成下面這些真的音檔）：
+還需要三個播放用的音檔。`python app/generate_examples.py` 只會產生
+`app/demo_assets/normal_report.json`/`low_report.json` 這兩個 JSON，不會
+產生音檔——在還沒有真的錄音檔可用時，用這段指令產生純音調占位檔（僅供開發
+測試網頁用，正式錄影前務必替換成下面這些真的音檔）：
+
+```bash
+python -c "
+import numpy as np, soundfile as sf, os
+os.makedirs('app/demo_assets', exist_ok=True)
+sr = 16000
+for name, freq, dur in [('greeting.wav', 440, 2.5), ('normal.wav', 523, 2.0), ('low.wav', 330, 2.0)]:
+    t = np.linspace(0, dur, int(sr*dur), endpoint=False)
+    tone = (0.2 * np.sin(2*np.pi*freq*t)).astype(np.float32)
+    sf.write(f'app/demo_assets/{name}', tone, sr)
+"
+```
+
+正式錄影前，把占位檔換成真的音檔：
 
 ```bash
 cp raw/normal.wav app/demo_assets/normal.wav
