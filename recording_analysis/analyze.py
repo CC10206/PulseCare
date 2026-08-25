@@ -53,6 +53,7 @@ def main():
         print(f"  {k:<14} {feats[k]:>10.4f}")
 
     lex = None
+    transcript_text = None
     if args.transcribe:
         from transcribe import transcribe
         t1 = time.time()
@@ -63,6 +64,7 @@ def main():
         print(f"  逐字稿: {tr['text']}")
         lex = lexical_features(tr["text"])
         print(f"  消極詞彙: {lex['neg_words'] or '無'}  (count={lex['neg_word_count']})")
+        transcript_text = tr["text"]
 
     # 隱私邊界：特徵抽取完成後，原始音檔即可銷毀
     if not args.keep_audio:
@@ -86,7 +88,8 @@ def main():
 
         if args.json:
             report = build_report(idx, contribs, level, recent[-7:],
-                                   elder_name=args.elder_name)
+                                   elder_name=args.elder_name,
+                                   transcript=transcript_text)
             with open(args.json, "w", encoding="utf-8") as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
             print(f"\n  [app] 家屬/社工 App 報告已寫出 → {args.json}")
