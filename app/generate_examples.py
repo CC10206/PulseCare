@@ -8,14 +8,20 @@
 analyze.py 實際會呼叫的同一套真實程式碼，不是另外編的假資料。
 
 正式錄好 normal.wav / low.wav 後，改用：
-    python analyze.py normal.wav --baseline baseline_flat.json  --json app/green_example.json
-    python analyze.py low.wav    --baseline baseline_down.json  --json app/yellow_example.json
+    python recording_analysis/analyze.py normal.wav --baseline baseline_flat.json  --json app/green_example.json
+    python recording_analysis/analyze.py low.wav    --baseline baseline_down.json  --json app/yellow_example.json
 取代這支腳本產生的範例檔。
 """
 import json
 import os
+import sys
+from pathlib import Path
 
 import numpy as np
+
+_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT / "core"))
+sys.path.insert(0, str(_ROOT / "recording_analysis"))
 
 from scoring import build_baseline, vitality_index, alert_level, build_report
 from seed_baseline import TYPICAL, JITTER, synthetic_trend

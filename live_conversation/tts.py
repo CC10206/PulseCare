@@ -5,7 +5,7 @@ PulseCare — 本地文字轉語音 (Qwen3-TTS via OpenVINO)
 
 前置設置（可行性驗證與逐步指令見 docs/tts-setup.md）：
 1. 在專案根目錄 clone Qwen3-TTS 原始碼到 `Qwen3-TTS/`，並把
-   `qwen_3_tts_helper.py` 放在專案根目錄。
+   `qwen_3_tts_helper.py` 放在 `live_conversation/`（跟這支檔案同一層）。
 2. 依 docs/tts-setup.md 的轉檔指令，把模型轉出到
    `models/qwen3-tts-0.6b-customvoice-ov/`。
 這兩者體積大、也不是我們自己的程式碼，所以不進版控 (見 .gitignore)。

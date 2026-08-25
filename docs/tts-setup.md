@@ -22,8 +22,9 @@
 
 ## Step 1｜Clone Qwen3-TTS 原始碼
 
-`qwen_3_tts_helper.py`（見下一步）會在自己所在目錄找一個 `Qwen3-TTS` 子目錄，
-所以要 clone 到 helper 檔案旁邊：
+`qwen_3_tts_helper.py` 放在 `live_conversation/`，但它會往上一層找 `Qwen3-TTS`
+子目錄，所以 Qwen3-TTS 原始碼要 clone 到**專案根目錄**（跟 `live_conversation/`
+同一層），不是跟 helper 檔案放一起：
 
 ```bash
 git clone https://github.com/QwenLM/Qwen3-TTS.git
@@ -53,7 +54,7 @@ cd ..
 ./.venv/Scripts/python.exe -m pip install -q \
   "transformers==4.57.3" "accelerate==1.12.0" librosa soundfile sox onnxruntime einops
 
-curl -o qwen_3_tts_helper.py \
+curl -o live_conversation/qwen_3_tts_helper.py \
   https://raw.githubusercontent.com/openvinotoolkit/openvino_notebooks/latest/notebooks/qwen3-tts/qwen_3_tts_helper.py
 ```
 

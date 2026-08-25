@@ -31,13 +31,13 @@ $env:PYTHONUTF8=1; $env:PYTHONIOENCODING="utf-8"
 python -m pytest -q                      # 應為 20 passed
 python -c "import openvino_genai; print('genai ok')"
 ls models\whisper-small-int8, models\qwen2.5-1.5b-instruct-int4-ov, models\qwen3-tts-0.6b-customvoice-ov
-ls Qwen3-TTS\, qwen_3_tts_helper.py      # TTS 的外部相依，不在版控裡
+ls Qwen3-TTS\, live_conversation\qwen_3_tts_helper.py      # TTS 的外部相依，不在版控裡
 python -c "import sounddevice as sd; print(sd.query_devices())"   # 確認麥克風在清單裡
 ```
 
 - [ ] pytest 20 passed
 - [ ] 三個模型目錄都在
-- [ ] `Qwen3-TTS/` 與 `qwen_3_tts_helper.py` 都在專案根目錄
+- [ ] `Qwen3-TTS/` 在專案根目錄，`qwen_3_tts_helper.py` 在 `live_conversation/`
 - [ ] 麥克風出現在 `query_devices()` 且沒被其他程式（Teams / OBS 獨占模式）佔用
 - [ ] `raw/normal.wav`、`raw/low.wav` 已備份（見下一節）
 
@@ -71,7 +71,7 @@ ffmpeg -i raw.m4a -ar 16000 -ac 1 -c:a pcm_s16le normal.wav
 mkdir -p raw && cp normal.wav low.wav raw/
 ```
 
-**`analyze.py` 預設會在特徵抽取後 `os.remove()` 掉輸入音檔**（[analyze.py:63-66](../analyze.py#L63-L66)）。
+**`analyze.py` 預設會在特徵抽取後 `os.remove()` 掉輸入音檔**（[analyze.py:67-70](../recording_analysis/analyze.py#L67-L70)）。
 這是隱私設計、不是 bug，而且是影片裡要指給評審看的重點——但也代表**每跑一次沒帶
 `--keep-audio` 的指令就會少掉一個素材**。
 
@@ -89,8 +89,8 @@ cp raw/normal.wav . && cp raw/low.wav .
 
 ### Scene 1 — 專案結構與隱私承諾（螢幕：編輯器）
 
-不跑指令。鏡頭停在 [analyze.py:63-66](../analyze.py#L63-L66) 與
-[live_session.py:71-74](../live_session.py#L71-L74) 這兩段 `os.remove`，
+不跑指令。鏡頭停在 [analyze.py:67-70](../recording_analysis/analyze.py#L67-L70) 與
+[live_session.py:75-78](../live_conversation/live_session.py#L75-L78) 這兩段 `os.remove`，
 講「原始音檔在特徵抽取完就銷毀，離開這台機器的只有數值」。
 
 這是整個隱私論述的實體證據，值得給一個特寫。
@@ -98,8 +98,8 @@ cp raw/normal.wav . && cp raw/low.wav .
 ### Scene 2 — 正常語氣：六個特徵 + 本地轉錄 + 指數
 
 ```bash
-python seed_baseline.py --from-wav raw/normal.wav --days 14 -o baseline.json
-cp raw/normal.wav . && python analyze.py normal.wav --transcribe --baseline baseline.json --keep-audio
+python recording_analysis/seed_baseline.py --from-wav raw/normal.wav --days 14 -o baseline.json
+cp raw/normal.wav . && python recording_analysis/analyze.py normal.wav --transcribe --baseline baseline.json --keep-audio
 ```
 
 預期畫面：六個特徵數值、Whisper 逐字稿、活力指數落在 **45–55** 附近。
@@ -109,7 +109,7 @@ cp raw/normal.wav . && python analyze.py normal.wav --transcribe --baseline base
 ### Scene 3 — 低落語氣：同一套管線，指數明顯下降
 
 ```bash
-cp raw/low.wav . && python analyze.py low.wav --transcribe --baseline baseline.json --keep-audio
+cp raw/low.wav . && python recording_analysis/analyze.py low.wav --transcribe --baseline baseline.json --keep-audio
 ```
 
 預期：指數明顯低於 Scene 2（目標 **< 40**），且「特徵貢獻」那幾行能指出是
@@ -123,7 +123,7 @@ cp raw/low.wav . && python analyze.py low.wav --transcribe --baseline baseline.j
 ```bash
 cp raw/normal.wav _privacy_demo.wav
 ls _privacy_demo.wav
-python analyze.py _privacy_demo.wav --baseline baseline.json
+python recording_analysis/analyze.py _privacy_demo.wav --baseline baseline.json
 ls _privacy_demo.wav          # 檔案已不存在
 ```
 
@@ -133,11 +133,11 @@ ls _privacy_demo.wav          # 檔案已不存在
 ### Scene 5 — 家屬／社工 App 畫面（螢幕：瀏覽器）
 
 ```bash
-python seed_baseline.py --trend flat -o baseline_flat.json
-python seed_baseline.py --trend down --trend-end 30 -o baseline_down.json
+python recording_analysis/seed_baseline.py --trend flat -o baseline_flat.json
+python recording_analysis/seed_baseline.py --trend down --trend-end 30 -o baseline_down.json
 
-cp raw/normal.wav . && python analyze.py normal.wav --baseline baseline_flat.json --json app/green_example.json  --elder-name 李奶奶 --keep-audio
-cp raw/low.wav .    && python analyze.py low.wav    --baseline baseline_down.json --json app/yellow_example.json --elder-name 李奶奶 --keep-audio
+cp raw/normal.wav . && python recording_analysis/analyze.py normal.wav --baseline baseline_flat.json --json app/green_example.json  --elder-name 李奶奶 --keep-audio
+cp raw/low.wav .    && python recording_analysis/analyze.py low.wav    --baseline baseline_down.json --json app/yellow_example.json --elder-name 李奶奶 --keep-audio
 
 python -m http.server
 ```
@@ -161,8 +161,8 @@ python -m http.server
 ### Scene 6 — Phase 2：真的對著麥克風跑一輪完整對話
 
 ```bash
-python seed_baseline.py --trend flat -o baseline.json
-python live_session.py --baseline baseline.json --json app/live_example.json
+python recording_analysis/seed_baseline.py --trend flat -o baseline.json
+python live_conversation/live_session.py --baseline baseline.json --json app/live_example.json
 ```
 
 流程與畫面節奏：
@@ -207,7 +207,7 @@ Scene 6 跑完一輪的實際牆鐘時間大約 **3–4 分鐘**，其中 2 分�
 - **基線用 median/MAD 而非 mean/std。** 對離群值穩健——感冒、家裡有訪客、
   電視聲都不會把基線帶歪。
 
-一定要講的免責（[scoring.py](../scoring.py) 的設計前提，也是提案的誠信基礎）：
+一定要講的免責（[scoring.py](../core/scoring.py) 的設計前提，也是提案的誠信基礎）：
 
 - 指數 50 = **這位長者自己的常態**，是相對個人基線的偏離度，不是跨人比較、
   更不是憂鬱症篩檢或臨床診斷。
@@ -225,7 +225,7 @@ Scene 6 跑完一輪的實際牆鐘時間大約 **3–4 分鐘**，其中 2 分�
 | `OSError: [WinError 127]` | `torchaudio` 與 `torch` 版本不匹配 | 兩者都釘 `2.8.0`，走 `--extra-index-url .../whl/cpu` |
 | `ModuleNotFoundError: No module named 'openvino_genai'` | 用到系統 python 而非 venv | 先跑 `Activate.ps1` |
 | 錄音 5 秒後報「沒有收到任何錄音資料」 | 麥克風被其他程式獨占，或選到沒有輸入聲道的裝置 | 關掉 Teams/OBS 獨占模式；`listen.py` 的 `pick_input_device()` 會自動退回第一個有輸入聲道的裝置 |
-| 錄滿 20 秒都沒停 | VAD 沒偵測到語音（音量太小／選錯裝置） | 檢查系統輸入音量，或用 `python listen.py test.wav` 單獨測錄音 |
+| 錄滿 20 秒都沒停 | VAD 沒偵測到語音（音量太小／選錯裝置） | 檢查系統輸入音量，或用 `python live_conversation/listen.py test.wav` 單獨測錄音 |
 | `family_view.html` 顯示「載入失敗」 | 用 `file://` 直接開 | 一定要 `python -m http.server` 再走 `http://localhost:8000/...` |
 | `音檔太短 (x.xs)` | 音檔不足 3 秒 | `features.py` 的下限，重錄 |
 | 素材不見了 | 跑了沒帶 `--keep-audio` 的 `analyze.py` | 從 `raw/` 複製回來——所以務必先備份 |
@@ -239,4 +239,4 @@ Scene 6 跑完一輪的實際牆鐘時間大約 **3–4 分鐘**，其中 2 分�
 2. **LLM 回應偏長。** `llm_reply.py` 的 system prompt 要求「只用一到兩句」，
    但實測會生出四句、約 80 字。除了不合設計，還會讓 TTS 的合成時間等比拉長
    （80 字 ≈ 20 秒語音 ≈ 150 秒合成）。拍片前可考慮把
-   [llm_reply.py](../llm_reply.py) 的 `max_new_tokens` 從 60 再調低。
+   [llm_reply.py](../live_conversation/llm_reply.py) 的 `max_new_tokens` 從 60 再調低。

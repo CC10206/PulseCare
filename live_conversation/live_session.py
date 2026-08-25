@@ -9,12 +9,16 @@ PulseCare — 即時對話迴路 (Phase 2)
 不在這支程式的範圍內。
 
 用法:
-    python live_session.py --baseline baseline.json --json app/live_example.json
+    python live_conversation/live_session.py --baseline baseline.json --json app/live_example.json
 """
 import argparse
 import json
 import os
+import sys
 import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
 from features import extract_features, lexical_features, FEATURE_KEYS
 from scoring import build_baseline, vitality_index, explain, alert_level, build_report
