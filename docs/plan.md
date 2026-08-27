@@ -1,6 +1,6 @@
 # PulseCare — Phase 1：核心特徵管線
 
-Phase 1 驗收標準：`python analyze.py sample.wav --transcribe --baseline baseline.json`
+Phase 1 驗收標準：`python recording_analysis/analyze.py sample.wav --transcribe --baseline baseline.json`
 能印出 6 個聲學特徵、一段本地轉錄的逐字稿、一個 0–100 的活力指數。
 
 ---
@@ -16,10 +16,23 @@ pip install -r requirements.txt
 
 Windows 上 `opensmile` 若安裝失敗，先裝 Visual C++ Build Tools。
 
-**先驗證聲學這條線能跑**（不需要任何模型下載）：
+⚠️ **venv 的路徑不能包含非 ASCII 字元**（例如中文）。`opensmile` 底層用
+`ctypes` 把套件安裝路徑用純 ASCII 編碼傳給 C library，如果 venv 裝在類似
+`D:\桌面\PulseCare\.venv` 這種路徑下，`opensmile.Smile(...)` 會直接丟
+`UnicodeEncodeError`——而且只 `import opensmile` 不會觸發，要實際建立
+`Smile` 物件才會炸，容易漏測。專案程式碼本身放在中文路徑沒關係，
+但 **venv 要建在純 ASCII 路徑**（例如使用者家目錄下，不要跟著專案走）。
+
+**先驗證聲學這條線能跑**（不需要任何模型下載——這裡刻意真的建立
+`Smile` 物件，只 import 不會測到上面那個坑）：
 
 ```bash
-python -c "import opensmile,parselmouth,librosa; print('ok')"
+python -c "
+import opensmile, parselmouth, librosa
+opensmile.Smile(feature_set=opensmile.FeatureSet.eGeMAPSv02,
+                 feature_level=opensmile.FeatureLevel.Functionals)
+print('ok')
+"
 ```
 
 ---
@@ -84,7 +97,7 @@ ffmpeg -i raw.m4a -ar 16000 -ac 1 -c:a pcm_s16le normal.wav
 ## Step 3｜跑通聲學特徵 (30 分)
 
 ```bash
-python features.py normal.wav
+python core/features.py normal.wav
 ```
 
 六個特徵的意義：
@@ -107,7 +120,7 @@ python features.py normal.wav
 ## Step 4｜跑通本地轉錄 (30 分)
 
 ```bash
-python transcribe.py normal.wav
+python core/transcribe.py normal.wav
 ```
 
 注意 OpenVINO GenAI 的 `return_timestamps=True` 給的是**片段級**時間戳，
@@ -122,9 +135,9 @@ python transcribe.py normal.wav
 ## Step 5｜建立基線並計分 (45 分)
 
 ```bash
-python seed_baseline.py --from-wav normal.wav --days 14 -o baseline.json
-python analyze.py normal.wav --keep-audio --baseline baseline.json   # 應接近 50
-python analyze.py low.wav    --keep-audio --baseline baseline.json   # 應明顯低於 50
+python recording_analysis/seed_baseline.py --from-wav normal.wav --days 14 -o baseline.json
+python recording_analysis/analyze.py normal.wav --keep-audio --baseline baseline.json   # 應接近 50
+python recording_analysis/analyze.py low.wav    --keep-audio --baseline baseline.json   # 應明顯低於 50
 ```
 
 `--keep-audio` 只在調試時用。正式流程不加這個旗標，音檔會在特徵抽取後立即刪除
@@ -135,7 +148,7 @@ python analyze.py low.wav    --keep-audio --baseline baseline.json   # 應明顯
 ## Step 6｜Phase 1 驗收 (30 分)
 
 ```bash
-python analyze.py low.wav --transcribe --baseline baseline.json
+python recording_analysis/analyze.py low.wav --transcribe --baseline baseline.json
 ```
 
 三個都要成立才算過關：
@@ -157,11 +170,11 @@ python analyze.py low.wav --transcribe --baseline baseline.json
 
 ```bash
 # 產生一份會真的觸發 yellow 的合成歷史（下滑趨勢，接的是真實 alert_level() 邏輯）
-python seed_baseline.py --trend down --trend-end 30 -o baseline_down.json
-python seed_baseline.py --trend flat -o baseline_flat.json
+python recording_analysis/seed_baseline.py --trend down --trend-end 30 -o baseline_down.json
+python recording_analysis/seed_baseline.py --trend flat -o baseline_flat.json
 
-python analyze.py normal.wav --baseline baseline_flat.json --json app/green_example.json
-python analyze.py low.wav    --baseline baseline_down.json --json app/yellow_example.json
+python recording_analysis/analyze.py normal.wav --baseline baseline_flat.json --json app/green_example.json
+python recording_analysis/analyze.py low.wav    --baseline baseline_down.json --json app/yellow_example.json
 
 python -m http.server
 # 瀏覽 http://localhost:8000/app/family_view.html?data=green_example.json
@@ -179,19 +192,64 @@ python -m http.server
 
 ---
 
+## Step 8｜即時對話迴路 (Phase 2)
+
+對應 `structure.png`：排程器 → TTS 問候 → 麥克風錄音 (VAD 自動斷句) →
+既有的聲學特徵 + Whisper pipeline → 小型 LLM 生成回應 → TTS 念出來。
+`analyze.py` 吃的是一個現成的 wav 檔；`live_session.py` 是真的對著麥克風講話。
+
+**額外設置**（在 Phase 1 的 venv 之外，這三塊都是新的相依）：
+
+1. 麥克風 + VAD：`pip install sounddevice silero-vad torch`（已在 requirements.txt）。
+2. LLM 回應：把 `Qwen/Qwen2.5-1.5B-Instruct` 用跟 Whisper 一樣的方式轉檔——
+   ```bash
+   optimum-cli export openvino \
+     --model "Qwen/Qwen2.5-1.5B-Instruct" \
+     --task text-generation-with-past --trust-remote-code \
+     --weight-format int4 --group-size 128 --ratio 1.0 --sym \
+     models/qwen2.5-1.5b-instruct-int4-ov
+   ```
+3. TTS：**不是**單行 `optimum-cli` 能搞定，需要額外 clone 原始碼、手動轉檔。
+   完整可行性驗證記錄與逐步指令見 **[`docs/tts-setup.md`](docs/tts-setup.md)**——
+   結論是 GO（Qwen3-TTS-0.6B 能合成可用的中文語音），但過程比 Whisper/Qwen2.5
+   的匯出麻煩，遇到問題先查那份文件。
+
+```bash
+python recording_analysis/seed_baseline.py --trend flat -o baseline.json
+python live_conversation/live_session.py --baseline baseline.json --json app/live_example.json
+```
+
+「排程器」不是真的 OS 層級排程——執行 `live_session.py` 本身就代表
+「排程觸發的那一刻」，真正的定時觸發是部署環境的責任，不在這支程式裡。
+隱私邊界跟 `analyze.py` 一致：麥克風錄到的原始音檔在特徵抽取 + 轉錄完成後
+立即刪除，`--keep-audio` 只在除錯時用。
+
+---
+
 ## 檔案說明
 
 | 檔案 | 用途 |
 |---|---|
-| `feature_keys.py` | 6 個核心特徵的鍵名（獨立成檔，讓 `scoring.py` 不用裝 librosa/opensmile 就能測試） |
-| `features.py` | 聲學 + 詞彙特徵抽取 |
-| `scoring.py` | 個人基線、活力指數、燈號、可解釋性、App 報告組裝 |
-| `transcribe.py` | OpenVINO Whisper 本地轉錄 |
-| `analyze.py` | Phase 1 主 CLI |
-| `seed_baseline.py` | 產生合成基線（Demo 用），支援 `--trend flat/down/up` |
+| `core/feature_keys.py` | 6 個核心特徵的鍵名（獨立成檔，讓 `scoring.py` 不用裝 librosa/opensmile 就能測試） |
+| `core/features.py` | 聲學 + 詞彙特徵抽取 |
+| `core/scoring.py` | 個人基線、活力指數、燈號、可解釋性、App 報告組裝 |
+| `core/transcribe.py` | OpenVINO Whisper 本地轉錄 |
+| `recording_analysis/analyze.py` | Phase 1 主 CLI（吃一個現成 wav 檔） |
+| `recording_analysis/seed_baseline.py` | 產生合成基線（Demo 用），支援 `--trend flat/down/up` |
 | `app/family_view.html` | 家屬/社工 App 畫面（單頁網頁，讀 `--json` 輸出） |
 | `app/generate_examples.py` | 在沒有真實錄音時，產生 App 畫面的示意資料 |
-| `test_scoring.py`, `test_seed_baseline.py` | pytest 單元測試 |
+| `live_conversation/listen.py` | 麥克風錄音 + silero-vad 自動斷句 |
+| `live_conversation/llm_reply.py` | 本地小型 LLM 生成回應 (Qwen2.5 via OpenVINO GenAI) |
+| `live_conversation/tts.py` | 本地文字轉語音 (Qwen3-TTS via OpenVINO，設置見 `docs/tts-setup.md`) |
+| `live_conversation/qwen_3_tts_helper.py` | Qwen3-TTS 的 OpenVINO 推論 wrapper（外部相依，不進版控，見 `docs/tts-setup.md`） |
+| `live_conversation/live_session.py` | Phase 2 主 CLI，真的對著麥克風跑一輪完整對話 |
+| `test_*.py` | pytest 單元測試（跟被測模組放同一層資料夾，只測不需要硬體/模型的純邏輯部分） |
+| `docs/demo-steps.md` | Demo 影片拍攝腳本（分鏡、實測耗時與剪輯點、旁白要點、故障排除） |
+| `docs/tts-setup.md` | Qwen3-TTS 可行性驗證與轉檔步驟 |
+
+`core/` 是兩個 phase 共用的引擎，`recording_analysis/analyze.py` 與
+`live_conversation/live_session.py` 都直接 import 它裡面的模組；pytest 透過
+`pytest.ini` 的 `pythonpath` 設定讓三個資料夾互相看得到彼此。
 
 ## 重要聲明
 

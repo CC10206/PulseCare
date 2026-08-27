@@ -52,3 +52,27 @@ def test_build_report_explain_reflects_worst_contribs():
     )
 
     assert any("語速" in line for line in report["explain"])
+
+
+def test_build_report_includes_contribs_and_transcript():
+    report = build_report(
+        idx=34.2,
+        contribs=_sample_contribs(),
+        level="yellow",
+        trend=[34.2],
+        transcript="早安，昨晚睡得不太好。",
+    )
+
+    assert report["contribs"] == _sample_contribs()
+    assert report["transcript"] == "早安，昨晚睡得不太好。"
+
+
+def test_build_report_transcript_defaults_to_none():
+    report = build_report(
+        idx=50.0,
+        contribs=_sample_contribs(),
+        level="green",
+        trend=[50.0],
+    )
+
+    assert report["transcript"] is None

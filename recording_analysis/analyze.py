@@ -2,10 +2,10 @@
 PulseCare Phase 1 CLI
 
 用法:
-    python analyze.py sample.wav                    # 只跑聲學特徵 (不需模型)
-    python analyze.py sample.wav --transcribe       # 加上本地 Whisper 轉錄
-    python analyze.py sample.wav --baseline base.json
-    python analyze.py sample.wav --baseline base.json --json out.json --elder-name 李奶奶
+    python recording_analysis/analyze.py sample.wav                    # 只跑聲學特徵 (不需模型)
+    python recording_analysis/analyze.py sample.wav --transcribe       # 加上本地 Whisper 轉錄
+    python recording_analysis/analyze.py sample.wav --baseline base.json
+    python recording_analysis/analyze.py sample.wav --baseline base.json --json out.json --elder-name 李奶奶
 
 Phase 1 的驗收標準：這支程式能印出 6 個特徵 + 一個活力指數。
 --json 額外輸出一份給家屬/社工 App 畫面用的結構化報告 (見 app/family_view.html)。
@@ -13,7 +13,11 @@ Phase 1 的驗收標準：這支程式能印出 6 個特徵 + 一個活力指數
 import argparse
 import json
 import os
+import sys
 import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
 from features import extract_features, lexical_features, FEATURE_KEYS
 from scoring import build_baseline, vitality_index, explain, alert_level, build_report
@@ -49,6 +53,7 @@ def main():
         print(f"  {k:<14} {feats[k]:>10.4f}")
 
     lex = None
+    transcript_text = None
     if args.transcribe:
         from transcribe import transcribe
         t1 = time.time()
@@ -59,6 +64,7 @@ def main():
         print(f"  逐字稿: {tr['text']}")
         lex = lexical_features(tr["text"])
         print(f"  消極詞彙: {lex['neg_words'] or '無'}  (count={lex['neg_word_count']})")
+        transcript_text = tr["text"]
 
     # 隱私邊界：特徵抽取完成後，原始音檔即可銷毀
     if not args.keep_audio:
@@ -82,7 +88,8 @@ def main():
 
         if args.json:
             report = build_report(idx, contribs, level, recent[-7:],
-                                   elder_name=args.elder_name)
+                                   elder_name=args.elder_name,
+                                   transcript=transcript_text)
             with open(args.json, "w", encoding="utf-8") as f:
                 json.dump(report, f, indent=2, ensure_ascii=False)
             print(f"\n  [app] 家屬/社工 App 報告已寫出 → {args.json}")

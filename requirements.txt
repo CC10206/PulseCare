@@ -9,14 +9,33 @@ opensmile>=2.5          # eGeMAPSv02 標準聲學特徵集
 praat-parselmouth>=0.4  # F0 交叉驗證
 
 # --- 本地推論 (Phase 1 步驟 3 起) ---
-openvino-genai>=2025.0
-openvino>=2025.0
+# >=2025.4.0 是 openvino_genai 支援 Qwen3-TTS 轉出的 IR 所需的最低版本
+openvino-genai>=2025.4.0
+openvino>=2025.4.0
 
 # --- 模型轉換 (只在轉檔時需要，可裝在另一個 venv) ---
 optimum[openvino]>=1.24
 transformers>=4.45
 
-# --- Phase 2 起 ---
-# sounddevice          # 麥克風錄音
-# silero-vad           # 語音活動偵測
+# --- Phase 2：即時對話迴路 (麥克風 → VAD → LLM 回應 → TTS) ---
+sounddevice>=0.4     # 麥克風錄音
+silero-vad>=5.1      # 語音活動偵測 (VADIterator 自動斷句)
+scipy>=1.11           # listen.py 即時降採樣 (WDM-KS 裝置只吃原生取樣率，見 listen.py 註解)
+
+# torchaudio 一定要跟 torch 版本對齊，否則 Windows 上原生擴充庫載入會炸
+# (OSError: [WinError 127])。torch>=2.6 沒釘死小版本會讓 pip 選到不匹配的
+# torchaudio，親測 torch==2.8.0 + torchaudio==2.8.0 (CPU wheel) 可行。
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.8.0
+torchaudio==2.8.0
+
+# Qwen3-TTS (via OpenVINO) 執行期需要的額外相依，requirements.txt 本身管不到
+# 「clone Qwen3-TTS 原始碼 + pip install -e」那一步，完整可行性驗證與逐步
+# 指令見 docs/tts-setup.md。這幾個是實測跑起來後才發現漏裝的：
+sox                   # Qwen3-TTS 內部 import，缺了會 ModuleNotFoundError
+onnxruntime            # speech tokenizer 用
+einops
+accelerate
+
+# --- Phase 3 起 ---
 # fastapi uvicorn      # Phase 3 後端

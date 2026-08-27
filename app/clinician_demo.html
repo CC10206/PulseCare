@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PulseCare Clinician Demo</title>
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14181d;
+    --border: #262b31;
+    --text: #e6e9ec;
+    --muted: #8b939c;
+    --accent: #4dd0a3;
+    --green: #2fb672;
+    --yellow: #d9a220;
+    --canvas-bg: #0d1117;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+
+  #reset-link {
+    position: fixed;
+    top: 16px;
+    right: 20px;
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  #reset-link:hover { color: var(--text); }
+
+  .stage { width: 100%; max-width: 720px; }
+
+  header { text-align: center; margin-bottom: 32px; }
+  header h1 { font-size: 22px; margin: 0 0 8px; }
+  header p { color: var(--muted); font-size: 14px; margin: 0; }
+
+  #start-screen { display: flex; justify-content: center; padding: 60px 0; }
+  #start-btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--accent); color: #04211a; border: none;
+    padding: 16px 32px; font-size: 18px; font-weight: 600;
+    border-radius: 999px; cursor: pointer;
+  }
+  #start-btn:hover { filter: brightness(1.08); }
+  #start-btn svg { width: 20px; height: 20px; }
+
+  #playback { text-align: center; margin-bottom: 32px; }
+  .status-row {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-bottom: 12px; font-size: 16px; color: var(--text); min-height: 24px;
+  }
+  .status-row .icon svg { width: 22px; height: 22px; display: block; }
+  #waveform {
+    width: 100%; max-width: 640px; height: 120px;
+    background: var(--canvas-bg); border: 1px solid var(--border); border-radius: 12px;
+  }
+
+  .report-card, .comparison-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 16px;
+    padding: 20px 22px; margin-bottom: 20px;
+  }
+  .report-card h3, .comparison-card h3 {
+    margin: 0 0 14px; font-size: 15px; color: var(--muted); font-weight: 600;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .comparison-card h3 .icon svg { width: 18px; height: 18px; display: block; }
+
+  .index-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 18px; }
+  .index-value { font-size: 40px; font-weight: 700; }
+  .index-label { font-size: 14px; }
+  .level-green .index-value, .level-green .index-label { color: var(--green); }
+  .level-yellow .index-value, .level-yellow .index-label { color: var(--yellow); }
+  .level-calibrating .index-value, .level-calibrating .index-label { color: var(--muted); }
+
+  .bars { margin-bottom: 18px; }
+  .bar-row {
+    display: grid; grid-template-columns: 80px 1fr 48px; align-items: center;
+    gap: 10px; margin-bottom: 8px; font-size: 13px;
+  }
+  .bar-label { color: var(--muted); }
+  .bar-track {
+    position: relative; height: 8px; background: var(--border);
+    border-radius: 4px; overflow: hidden;
+  }
+  .bar-track::after {
+    content: ""; position: absolute; left: 50%; top: 0; bottom: 0;
+    width: 1px; background: rgba(255,255,255,0.18);
+  }
+  .bar-fill { position: absolute; top: 0; bottom: 0; }
+  .bar-fill.bar-neg { right: 50%; }
+  .bar-fill.bar-pos { left: 50%; }
+  .bar-fill.bar-neutral { background: var(--muted); }
+  .bar-fill.bar-warn { background: var(--yellow); }
+  .bar-value { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .transcript {
+    font-size: 14px; line-height: 1.7; margin-bottom: 14px;
+    padding: 12px 14px; background: rgba(255,255,255,0.03); border-radius: 10px;
+  }
+  .disclaimer {
+    font-size: 11px; color: var(--muted); line-height: 1.6;
+    padding-top: 10px; border-top: 1px solid var(--border);
+  }
+
+  .compare-row { display: flex; gap: 24px; margin-bottom: 14px; }
+  .compare-item {
+    flex: 1; text-align: center; padding: 16px;
+    background: rgba(255,255,255,0.03); border-radius: 12px;
+  }
+  .compare-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .compare-value { font-size: 28px; font-weight: 700; }
+  .compare-summary { font-size: 14px; line-height: 1.7; margin: 0 0 14px; }
+
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<a href="#" id="reset-link">Restart</a>
+
+<div class="stage">
+  <header>
+    <h1>PulseCare Voice Vitality Demo</h1>
+    <p>For clinician/reviewer reference only — not a diagnostic tool</p>
+  </header>
+
+  <div id="start-screen">
+    <button id="start-btn">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z"/></svg>
+      Start Demo
+    </button>
+  </div>
+
+  <div id="playback" hidden>
+    <div class="status-row">
+      <span class="icon" id="status-icon"></span>
+      <span id="status-text">Ready to start</span>
+    </div>
+    <canvas id="waveform" width="640" height="120"></canvas>
+  </div>
+
+  <div id="reports" hidden>
+    <div class="report-card" id="report-1" hidden></div>
+    <div class="report-card" id="report-2" hidden></div>
+    <div class="comparison-card" id="comparison" hidden></div>
+  </div>
+</div>
+
+<script>
+const ASSET_DIR = "demo_assets/";
+
+const FEATURE_LABELS = {
+  syll_rate: "Speech rate",
+  pause_mean_s: "Pause length",
+  f0_sd_st: "Pitch variability",
+  f0_range_st: "Pitch range",
+  loud_range: "Loudness range",
+  hnr_db: "Voice clarity",
+};
+const FEATURE_ORDER = Object.keys(FEATURE_LABELS);
+
+const LEVEL_LABEL = {
+  green: "Green · Stable",
+  yellow: "Yellow · Below usual",
+  calibrating: "Calibrating",
+};
+
+const ICONS = {
+  phone: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2a9 9 0 0 1 9 9"/><path d="M13 6a5 5 0 0 1 5 5"/><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"/></svg>',
+  mic: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19v3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><rect x="9" y="2" width="6" height="13" rx="3"/></svg>',
+  activity: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/></svg>',
+  arrows: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3 4 7l4 4"/><path d="M4 7h16"/><path d="m16 21 4-4-4-4"/><path d="M20 17H4"/></svg>',
+  rotateCcw: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>',
+};
+
+let audioCtx = null;
+let analyser = null;
+let animationId = null;
+
+function ensureAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.connect(audioCtx.destination);
+  }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+function playAudio(path) {
+  ensureAudioContext();
+  return new Promise((resolve, reject) => {
+    const audio = new Audio(path);
+    const source = audioCtx.createMediaElementSource(audio);
+    source.connect(analyser);
+    audio.addEventListener("ended", () => {
+      source.disconnect();
+      resolve();
+    });
+    audio.addEventListener("error", () => {
+      reject(new Error(`Unable to play ${path}. Please confirm this file exists under app/demo_assets/`));
+    });
+    audio.play().catch(reject);
+  });
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function drawWaveform() {
+  const canvas = document.getElementById("waveform");
+  const ctx = canvas.getContext("2d");
+  const data = new Uint8Array(analyser.frequencyBinCount);
+
+  function draw() {
+    animationId = requestAnimationFrame(draw);
+    ctx.fillStyle = "#0d1117";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    analyser.getByteTimeDomainData(data);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#4dd0a3";
+    ctx.beginPath();
+    const slice = canvas.width / data.length;
+    let x = 0;
+    for (let i = 0; i < data.length; i++) {
+      const v = data[i] / 128.0;
+      const y = (v * canvas.height) / 2;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      x += slice;
+    }
+    ctx.stroke();
+  }
+  draw();
+}
+
+function stopWaveform() {
+  if (animationId) cancelAnimationFrame(animationId);
+}
+
+function setStatus(iconName, text) {
+  document.getElementById("status-icon").innerHTML = ICONS[iconName] || "";
+  document.getElementById("status-text").textContent = text;
+}
+
+async function stage(iconName, text, audioPath) {
+  setStatus(iconName, text);
+  if (audioPath) {
+    await playAudio(audioPath);
+  }
+}
+
+async function analyzingPause() {
+  setStatus("activity", "Analyzing…");
+  await wait(1500);
+}
+
+async function transition(text) {
+  setStatus("rotateCcw", text);
+  await wait(1800);
+}
+
+async function fetchReport(filename) {
+  const res = await fetch(ASSET_DIR + filename);
+  if (!res.ok) {
+    throw new Error(
+      `Failed to load ${filename} (HTTP ${res.status}). Please generate the assets under app/demo_assets/ first by following docs/demo-steps.md.`
+    );
+  }
+  return res.json();
+}
+
+function renderReport(targetId, label, report) {
+  const el = document.getElementById(targetId);
+  el.hidden = false;
+
+  const bars = FEATURE_ORDER.map((key) => {
+    const z = (report.contribs && report.contribs[key]) || 0;
+    const magnitude = Math.abs(z);
+    const pct = Math.min(magnitude / 3, 1) * 50;
+    const posClass = z < 0 ? "bar-neg" : "bar-pos";
+    const colorClass = magnitude < 0.8 ? "bar-neutral" : "bar-warn";
+    return `
+      <div class="bar-row">
+        <span class="bar-label">${FEATURE_LABELS[key]}</span>
+        <div class="bar-track">
+          <div class="bar-fill ${posClass} ${colorClass}" style="width:${pct}%"></div>
+        </div>
+        <span class="bar-value">${z.toFixed(2)}</span>
+      </div>`;
+  }).join("");
+
+  el.innerHTML = `
+    <h3>${label}</h3>
+    <div class="index-row level-${report.level}">
+      <span class="index-value">${report.index}</span>
+      <span class="index-label">${LEVEL_LABEL[report.level] || report.level}</span>
+    </div>
+    <div class="bars">${bars}</div>
+    <div class="transcript"><strong>Transcript:</strong>${report.transcript || "(No transcript)"}</div>
+    <div class="disclaimer">${report.disclaimer}</div>
+  `;
+}
+
+function renderComparison(report1, report2) {
+  const el = document.getElementById("comparison");
+  el.hidden = false;
+
+  const c1 = report1.contribs || {};
+  const c2 = report2.contribs || {};
+  const deltas = FEATURE_ORDER
+    .map((key) => ({ key, delta: (c2[key] || 0) - (c1[key] || 0) }))
+    .sort((a, b) => a.delta - b.delta)
+    .slice(0, 2)
+    .filter((d) => d.delta < -0.5)
+    .map((d) => FEATURE_LABELS[d.key]);
+
+  const diff = (report1.index - report2.index).toFixed(1);
+  const summary = deltas.length
+    ? `Scenario 2's index is ${diff} points lower than Scenario 1's, with ${deltas.join(", ")} as the main contributors.`
+    : `Scenario 2's index is ${diff} points lower than Scenario 1's.`;
+
+  el.innerHTML = `
+    <h3><span class="icon">${ICONS.arrows}</span>Comparison Summary</h3>
+    <div class="compare-row">
+      <div class="compare-item"><span class="compare-label">Scenario 1</span><span class="compare-value">${report1.index}</span></div>
+      <div class="compare-item"><span class="compare-label">Scenario 2</span><span class="compare-value">${report2.index}</span></div>
+    </div>
+    <p class="compare-summary">${summary}</p>
+    <div class="disclaimer">${report1.disclaimer}</div>
+  `;
+}
+
+async function runDemo() {
+  document.getElementById("start-screen").hidden = true;
+  document.getElementById("playback").hidden = false;
+  document.getElementById("reports").hidden = false;
+  drawWaveform();
+
+  try {
+    const [report1, report2] = await Promise.all([
+      fetchReport("normal_report.json"),
+      fetchReport("low_report.json"),
+    ]);
+
+    await stage("phone", "System greeting…", ASSET_DIR + "greeting.wav");
+    await stage("mic", "Responding (Scenario 1: normal tone)", ASSET_DIR + "normal.wav");
+    await analyzingPause();
+    renderReport("report-1", "Scenario 1: Normal tone", report1);
+    await wait(2500);
+
+    await transition("A different day — Grandma Li is feeling low…");
+    await stage("phone", "System greeting…", ASSET_DIR + "greeting.wav");
+    await stage("mic", "Responding (Scenario 2: low mood)", ASSET_DIR + "low.wav");
+    await analyzingPause();
+    renderReport("report-2", "Scenario 2: Low mood", report2);
+    await wait(1500);
+
+    renderComparison(report1, report2);
+    setStatus("activity", "Demo complete");
+  } catch (err) {
+    setStatus("activity", err.message);
+  } finally {
+    stopWaveform();
+  }
+}
+
+document.getElementById("start-btn").addEventListener("click", () => {
+  ensureAudioContext();
+  runDemo();
+});
+
+document.getElementById("reset-link").addEventListener("click", (e) => {
+  e.preventDefault();
+  location.reload();
+});
+</script>
+</body>
+</html>

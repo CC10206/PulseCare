@@ -1,6 +1,6 @@
 {
   "elder_name": "李奶奶",
-  "date": "2026-08-19",
+  "date": "2026-08-25",
   "index": 44.4,
   "level": "green",
   "trend": [
@@ -12,6 +12,15 @@
     50.0,
     44.4
   ],
+  "contribs": {
+    "syll_rate": 0.03,
+    "pause_mean_s": -0.75,
+    "f0_sd_st": -0.32,
+    "f0_range_st": -0.35,
+    "loud_range": -0.42,
+    "hnr_db": -0.22
+  },
+  "transcript": "早安啊，有喔，昨晚睡得還不錯，謝謝關心。",
   "explain": [],
   "disclaimer": "本指數為相對於個人基線的偏離程度，非臨床診斷工具。"
 }
