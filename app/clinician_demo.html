@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PulseCare 心理師示範</title>
+<title>PulseCare Clinician Demo</title>
 <style>
   :root {
     --bg: #0b0d10;
@@ -128,12 +128,12 @@
 </head>
 <body>
 
-<a href="#" id="reset-link">重新開始</a>
+<a href="#" id="reset-link">Restart</a>
 
 <div class="stage">
   <header>
-    <h1>PulseCare 語音活力示範</h1>
-    <p>本示範供心理師／評審參考判讀，非診斷工具</p>
+    <h1>PulseCare Voice Vitality Demo</h1>
+    <p>For clinician/reviewer reference only — not a diagnostic tool</p>
   </header>
 
   <div id="start-screen">
@@ -146,7 +146,7 @@
   <div id="playback" hidden>
     <div class="status-row">
       <span class="icon" id="status-icon"></span>
-      <span id="status-text">準備開始</span>
+      <span id="status-text">Ready to start</span>
     </div>
     <canvas id="waveform" width="640" height="120"></canvas>
   </div>
@@ -162,19 +162,19 @@
 const ASSET_DIR = "demo_assets/";
 
 const FEATURE_LABELS = {
-  syll_rate: "語速",
-  pause_mean_s: "停頓長度",
-  f0_sd_st: "語調起伏",
-  f0_range_st: "音高範圍",
-  loud_range: "音量變化",
-  hnr_db: "聲線清晰度",
+  syll_rate: "Speech rate",
+  pause_mean_s: "Pause length",
+  f0_sd_st: "Pitch variability",
+  f0_range_st: "Pitch range",
+  loud_range: "Loudness range",
+  hnr_db: "Voice clarity",
 };
 const FEATURE_ORDER = Object.keys(FEATURE_LABELS);
 
 const LEVEL_LABEL = {
-  green: "綠燈．穩定",
-  yellow: "黃燈．較平常低落",
-  calibrating: "系統學習中",
+  green: "Green · Stable",
+  yellow: "Yellow · Below usual",
+  calibrating: "Calibrating",
 };
 
 const ICONS = {
@@ -213,7 +213,7 @@ function playAudio(path) {
       resolve();
     });
     audio.addEventListener("error", () => {
-      reject(new Error(`無法播放 ${path}，請確認 app/demo_assets/ 底下有這個檔案`));
+      reject(new Error(`Unable to play ${path}. Please confirm this file exists under app/demo_assets/`));
     });
     audio.play().catch(reject);
   });
@@ -267,7 +267,7 @@ async function stage(iconName, text, audioPath) {
 }
 
 async function analyzingPause() {
-  setStatus("activity", "分析中…");
+  setStatus("activity", "Analyzing…");
   await wait(1500);
 }
 
@@ -280,7 +280,7 @@ async function fetchReport(filename) {
   const res = await fetch(ASSET_DIR + filename);
   if (!res.ok) {
     throw new Error(
-      `載入 ${filename} 失敗（HTTP ${res.status}）。請先依 docs/demo-steps.md 產生 app/demo_assets/ 底下的素材。`
+      `Failed to load ${filename} (HTTP ${res.status}). Please generate the assets under app/demo_assets/ first by following docs/demo-steps.md.`
     );
   }
   return res.json();
@@ -313,7 +313,7 @@ function renderReport(targetId, label, report) {
       <span class="index-label">${LEVEL_LABEL[report.level] || report.level}</span>
     </div>
     <div class="bars">${bars}</div>
-    <div class="transcript"><strong>逐字稿：</strong>${report.transcript || "（無逐字稿）"}</div>
+    <div class="transcript"><strong>Transcript:</strong>${report.transcript || "(No transcript)"}</div>
     <div class="disclaimer">${report.disclaimer}</div>
   `;
 }
@@ -333,14 +333,14 @@ function renderComparison(report1, report2) {
 
   const diff = (report1.index - report2.index).toFixed(1);
   const summary = deltas.length
-    ? `情境二指數較情境一低 ${diff} 分，${deltas.join("、")}是主要偏離項目。`
-    : `情境二指數較情境一低 ${diff} 分。`;
+    ? `Scenario 2's index is ${diff} points lower than Scenario 1's, with ${deltas.join(", ")} as the main contributors.`
+    : `Scenario 2's index is ${diff} points lower than Scenario 1's.`;
 
   el.innerHTML = `
-    <h3><span class="icon">${ICONS.arrows}</span>對比摘要</h3>
+    <h3><span class="icon">${ICONS.arrows}</span>Comparison Summary</h3>
     <div class="compare-row">
-      <div class="compare-item"><span class="compare-label">情境一</span><span class="compare-value">${report1.index}</span></div>
-      <div class="compare-item"><span class="compare-label">情境二</span><span class="compare-value">${report2.index}</span></div>
+      <div class="compare-item"><span class="compare-label">Scenario 1</span><span class="compare-value">${report1.index}</span></div>
+      <div class="compare-item"><span class="compare-label">Scenario 2</span><span class="compare-value">${report2.index}</span></div>
     </div>
     <p class="compare-summary">${summary}</p>
     <div class="disclaimer">${report1.disclaimer}</div>
@@ -359,21 +359,21 @@ async function runDemo() {
       fetchReport("low_report.json"),
     ]);
 
-    await stage("phone", "系統問候中", ASSET_DIR + "greeting.wav");
-    await stage("mic", "李奶奶回覆中（情境一：正常語氣）", ASSET_DIR + "normal.wav");
+    await stage("phone", "System greeting…", ASSET_DIR + "greeting.wav");
+    await stage("mic", "Responding (Scenario 1: normal tone)", ASSET_DIR + "normal.wav");
     await analyzingPause();
-    renderReport("report-1", "情境一：正常語氣", report1);
+    renderReport("report-1", "Scenario 1: Normal tone", report1);
     await wait(2500);
 
-    await transition("換一天，李奶奶心情比較低落…");
-    await stage("phone", "系統問候中", ASSET_DIR + "greeting.wav");
-    await stage("mic", "李奶奶回覆中（情境二：低落語氣）", ASSET_DIR + "low.wav");
+    await transition("A different day — Grandma Li is feeling low…");
+    await stage("phone", "System greeting…", ASSET_DIR + "greeting.wav");
+    await stage("mic", "Responding (Scenario 2: low mood)", ASSET_DIR + "low.wav");
     await analyzingPause();
-    renderReport("report-2", "情境二：低落語氣", report2);
+    renderReport("report-2", "Scenario 2: Low mood", report2);
     await wait(1500);
 
     renderComparison(report1, report2);
-    setStatus("activity", "示範結束");
+    setStatus("activity", "Demo complete");
   } catch (err) {
     setStatus("activity", err.message);
   } finally {

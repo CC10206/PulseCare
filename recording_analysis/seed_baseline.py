@@ -9,7 +9,12 @@
 """
 import argparse
 import json
+import sys
+from pathlib import Path
+
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
 # 一位高齡者在正常狀態下的典型值 (作為沒有真實錄音時的起點)
 TYPICAL = {
