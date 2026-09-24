@@ -164,7 +164,7 @@ python recording_analysis/analyze.py low.wav --transcribe --baseline baseline.js
 
 ## Step 7｜家屬/社工 App 畫面 (Demo 影片用)
 
-`structure.png` 裡的「家屬/社工 App」畫面：一支手機比例的單頁網頁，讀取
+README 系統架構圖裡的「家屬/社工 App」畫面：一支手機比例的單頁網頁，讀取
 `analyze.py --json` 輸出的結構化報告，畫出燈號卡片＋7日趨勢圖＋柔性提示語。
 不含帳號/推播等後端，純粹是拍攝 Demo 影片用的視覺層。
 
@@ -194,7 +194,7 @@ python -m http.server
 
 ## Step 8｜即時對話迴路 (Phase 2)
 
-對應 `structure.png`：排程器 → TTS 問候 → 麥克風錄音 (VAD 自動斷句) →
+對應 README 系統架構圖：排程器 → TTS 問候 → 麥克風錄音 (VAD 自動斷句) →
 既有的聲學特徵 + Whisper pipeline → 小型 LLM 生成回應 → TTS 念出來。
 `analyze.py` 吃的是一個現成的 wav 檔；`live_session.py` 是真的對著麥克風講話。
 

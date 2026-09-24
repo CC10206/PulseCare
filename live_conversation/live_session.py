@@ -1,7 +1,7 @@
 """
 PulseCare — 即時對話迴路 (Phase 2)
 
-對應 structure.png：「排程器 → TTS 問候 → 麥克風錄音(VAD) → 現有 pipeline
+對應 README 系統架構圖：「排程器 → TTS 問候 → 麥克風錄音(VAD) → 現有 pipeline
 (聲學特徵 + Whisper 轉錄) → 小型 LLM 回應 → TTS」。
 
 這裡的「排程器」不是真的 OS 層級排程——執行這支程式本身就代表

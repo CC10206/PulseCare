@@ -5,7 +5,7 @@
 系統只問一句固定的開場問句，錄下回答，在本機抽取聲學特徵並與**長者自己過去 14 天的基線**比較，
 換算成一個 0–100 的活力指數與燈號。原始錄音在特徵抽取完成後立即銷毀，離開這台機器的只有數值。
 
-> ⚠️ 本系統計算的是「相對於個人基線的偏離程度」，**不是臨床診斷工具**，也不應被解讀為
+> 本系統計算的是「相對於個人基線的偏離程度」，**不是臨床診斷工具**，也不應被解讀為
 > 憂鬱症篩檢結果。六項特徵目前為等權佔位權重，正式部署前需由合作心理師依臨床經驗校準。
 
 ## 核心設計原則
@@ -22,17 +22,37 @@
 
 ## 系統架構
 
-```
-Phase 1（現成錄音檔）
-  wav → 聲學特徵 (opensmile/eGeMAPSv02) ─┬─→ 個人基線比對 → 活力指數 + 燈號 → 家屬/社工 App JSON
-        本地 Whisper 轉錄（消極詞彙、字幕）┘
+> 下圖為概念示意圖，用來說明資料流向與隱私邊界，非最終系統實作規格。
 
-Phase 2（即時對話迴路）
-  排程觸發 → TTS 問候 → 麥克風錄音 (silero-vad 自動斷句)
-           → 同一套聲學特徵 + Whisper pipeline → 本地小型 LLM 生成回應 → TTS 念出來
-```
+```mermaid
+flowchart TB
+    subgraph edge["長者家中（Edge，Intel 筆電模擬音箱）"]
+        A["排程器 → TTS 播放開場問候 → 麥克風錄音（VAD 切段）"]
+        A --> B["Whisper（OpenVINO GenAI，本地）<br/>逐字稿 + 詞級時間戳"]
+        A --> C["聲學特徵抽取（本地）<br/>openSMILE eGeMAPS ・ parselmouth F0/HNR ・ 能量、沙啞度"]
+        B --> B1["語速、停頓比"]
+        B --> B2["消極詞彙計數"]
+        B --> B3["小型 LLM（OpenVINO GenAI，本地）產生下一句回應 → TTS"]
+        B1 --> D["原始音檔在此銷毀，只有特徵向量 + 詞彙統計離開這個框"]
+        B2 --> D
+        C --> D
+    end
 
-完整架構圖見 [`docs/sturcture.png`](docs/sturcture.png)。
+    D -->|"約 20 個數字／天"| E
+
+    subgraph cloud["Cloud / Gateway"]
+        E["個人基線（SQLite）→ 活力指數 → 7 日趨勢"]
+        F["連續 N 天低於門檻 → 黃燈事件"]
+        E --> F
+    end
+
+    subgraph family["家屬/社工 App"]
+        G["綠／黃／紅、柔性通知"]
+        H["長者端只看到笑臉"]
+    end
+
+    F --> G
+```
 
 ## 快速開始
 
@@ -43,7 +63,7 @@ python3.12 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> ⚠️ **venv 的路徑不能包含非 ASCII 字元**（例如中文）。`opensmile` 底層用 `ctypes` 把安裝路徑
+> **venv 的路徑不能包含非 ASCII 字元**（例如中文）。`opensmile` 底層用 `ctypes` 把安裝路徑
 > 以純 ASCII 傳給 C library，venv 若建在類似 `D:\桌面\PulseCare\.venv` 這種路徑下，
 > `opensmile.Smile(...)` 會直接丟 `UnicodeEncodeError`。專案程式碼本身放中文路徑沒關係，
 > 但 **venv 要建在純 ASCII 路徑**（例如使用者家目錄下）。
