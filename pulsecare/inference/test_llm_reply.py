@@ -1,4 +1,4 @@
-from llm_reply import build_prompt, SYSTEM_PROMPT
+from pulsecare.inference.llm_reply import build_prompt, SYSTEM_PROMPT
 
 
 def test_build_prompt_includes_system_and_user_messages():

@@ -5,7 +5,7 @@ PulseCare — 本地文字轉語音 (Qwen3-TTS via OpenVINO)
 
 前置設置（可行性驗證與逐步指令見 docs/tts-setup.md）：
 1. 在專案根目錄 clone Qwen3-TTS 原始碼到 `Qwen3-TTS/`，並把
-   `qwen_3_tts_helper.py` 放在 `live_conversation/`（跟這支檔案同一層）。
+   `qwen_3_tts_helper.py` 放在 `pulsecare/inference/vendor/`。
 2. 依 docs/tts-setup.md 的轉檔指令，把模型轉出到
    `models/qwen3-tts-0.6b-customvoice-ov/`。
 這兩者體積大、也不是我們自己的程式碼，所以不進版控 (見 .gitignore)。
@@ -21,8 +21,19 @@ def get_model(model_dir: str = DEFAULT_MODEL_DIR, device: str = "CPU"):
     """延遲載入 —— 模型載入需要時間，不要在每次呼叫時重建 (同 transcribe.py 的作法)。"""
     global _model
     if _model is None:
+        # qwen_3_tts_helper.py 內部有一行 `parent.parent / "Qwen3-TTS"` 的
+        # sys.path 補丁，那是寫給它原本所在深度用的，搬進 vendor/ 之後會指向
+        # 不存在的位置。它是 vendored 檔不該改（見 CLAUDE.md），所以由這裡
+        # 補上正確的專案根目錄路徑；若已照 docs/tts-setup.md 做過
+        # `pip install -e Qwen3-TTS`，這一段是多餘的但無害。
+        import sys
+        from pathlib import Path
+        _qwen_src = Path(__file__).resolve().parents[2] / "Qwen3-TTS"
+        if _qwen_src.is_dir() and str(_qwen_src) not in sys.path:
+            sys.path.insert(0, str(_qwen_src))
+
         try:
-            from qwen_3_tts_helper import OVQwen3TTSModel
+            from pulsecare.inference.vendor.qwen_3_tts_helper import OVQwen3TTSModel
         except ImportError as e:
             raise RuntimeError(
                 "找不到 qwen_3_tts_helper.py / Qwen3-TTS。"

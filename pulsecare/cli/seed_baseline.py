@@ -4,17 +4,13 @@
 正式版本應由真實錄音累積 14 天。Demo 時誠實標註此為模擬資料。
 
 用法:
-    python seed_baseline.py --from-wav normal.wav --days 14 -o baseline.json
-    python seed_baseline.py --days 14 -o baseline.json     # 用內建典型值
+    python -m pulsecare.cli.seed_baseline --from-wav normal.wav --days 14 -o fixtures/baseline.json
+    python -m pulsecare.cli.seed_baseline --days 14 -o fixtures/baseline.json   # 用內建典型值
 """
 import argparse
 import json
-import sys
-from pathlib import Path
 
 import numpy as np
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
 
 # 一位高齡者在正常狀態下的典型值 (作為沒有真實錄音時的起點)
 TYPICAL = {
@@ -67,7 +63,7 @@ def main():
     args = ap.parse_args()
 
     if args.from_wav:
-        from features import extract_features
+        from pulsecare.sensing.features import extract_features
         center = extract_features(args.from_wav)["features"]
         print(f"以 {args.from_wav} 的特徵為中心")
     else:

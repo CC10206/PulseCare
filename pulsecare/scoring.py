@@ -9,7 +9,7 @@ PulseCare — 個人化基線與語音活力指數 (Phase 1)
 import datetime
 import json
 import numpy as np
-from feature_keys import FEATURE_KEYS
+from pulsecare.contracts.feature_keys import FEATURE_KEYS
 
 # +1 = 數值越高代表越有活力；-1 = 越高代表越低落
 DIRECTION = {
@@ -69,7 +69,7 @@ def build_report(idx: float, contribs: dict, level: str, trend: list[float],
     """組成給家屬/社工 App 畫面用的結構化報告 (見 analyze.py --json)。
 
     contribs/transcript 兩個附加欄位是給心理師示範頁面
-    (app/clinician_demo.html) 用的完整資訊；family_view.html 只讀
+    (web/clinician_demo.html) 用的完整資訊；family_view.html 只讀
     explain/disclaimer 等既有欄位，不受影響。
     """
     return {

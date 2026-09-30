@@ -1,0 +1,83 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pulsecare"
+version = "0.2.0"
+description = "從長者日常對話的聲音（不是內容）偵測活力狀態變化的隱私優先語音管線"
+# 3.13+ 部分套件輪子還不齊；上限刻意釘住，不要放寬（見 CLAUDE.md）
+requires-python = ">=3.11,<3.13"
+
+# 兩層共用的最小集合。任何加進這裡的東西都必須能在 aarch64 上裝起來。
+dependencies = [
+    "numpy>=1.26",
+    "soundfile>=0.12",
+]
+
+[project.optional-dependencies]
+# --- 邊緣感測節點 -------------------------------------------------------
+# 目標平台：KNEO Pi（4x Cortex-A55, 2GB RAM, aarch64, Arch Linux ARM）
+#   pip install -e .[sensing] --extra-index-url https://download.pytorch.org/whl/cpu
+#
+# 已驗證有 aarch64 wheel：opensmile 2.6.0 (manylinux_2_17_aarch64, py3-none)、
+#                          onnxruntime 1.30.0 (manylinux_2_28_aarch64, cp311-cp314)
+#
+# TODO(spec §5.3)：praat-parselmouth **沒有 aarch64 wheel**，所以這個 extra
+# 目前還裝不上 KNEO Pi。等 f0_sd_st 改由 eGeMAPS 推導之後把它移除，
+# 屆時 sensing/test_no_heavy_deps.py 的 xfail 會轉為通過。
+sensing = [
+    "opensmile>=2.5",          # eGeMAPSv02 標準聲學特徵集
+    "praat-parselmouth>=0.4",  # 待移除，見上方 TODO
+    "scipy>=1.11",             # capture.py 的即時降採樣 (resample_poly)
+    "sounddevice>=0.4",        # 麥克風錄音
+    "silero-vad>=5.1",         # VAD 自動斷句
+    "onnxruntime",             # silero-vad 的 onnx=True 模式需要
+    # torchaudio 一定要跟 torch 版本對齊，否則 Windows 上原生擴充庫載入會炸
+    # (OSError: [WinError 127])。親測 torch==2.8.0 + torchaudio==2.8.0 可行。
+    # torch 是 silero-vad 套件模組層的相依，即使走 ONNX 也拔不掉（spec §8.2）。
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+]
+
+# --- Server / 閘道器 ----------------------------------------------------
+#   pip install -e .[server]
+server = [
+    # >=2025.4.0 是 openvino_genai 支援 Qwen3-TTS 轉出的 IR 所需的最低版本
+    "openvino-genai>=2025.4.0",
+    "openvino>=2025.4.0",
+    "librosa>=0.10",           # inference/transcribe.py 載入音訊給 Whisper
+    "fastapi",                 # demo server
+    "uvicorn",                 # demo server
+    # Qwen3-TTS 執行期額外相依（實測跑起來才發現漏裝的）。
+    # 這裡管不到「clone Qwen3-TTS 原始碼 + pip install -e」那一步，
+    # 完整步驟見 docs/tts-setup.md。
+    "sox",
+    "onnxruntime",             # Qwen3-TTS 的 speech tokenizer
+    "einops",
+    "accelerate",
+]
+
+# --- 詞彙層（尚未實作，spec §5.6）---------------------------------------
+lexical = [
+    "opencc",                  # 繁簡正規化：Whisper 實測會輸出簡體字
+    "jieba",                   # 中文斷詞
+]
+
+# --- 模型轉檔（只在轉 IR 時需要，建議裝在另一個 venv）-------------------
+convert = [
+    "optimum[openvino]>=1.24",
+    "transformers>=4.45",
+]
+
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+include = ["pulsecare*"]
+
+[tool.pytest.ini_options]
+# Qwen3-TTS/ 是外部 clone 進來的原始碼（見 docs/tts-setup.md），
+# 裡面自帶的 examples/test_*.py 不是我們的測試，會撞到 import 錯誤。
+norecursedirs = ["Qwen3-TTS", ".venv", "models", "web", "fixtures", ".worktrees"]
+# 讓 `python -m pytest` 在沒有 `pip install -e .` 的環境也能 import pulsecare
+pythonpath = ["."]

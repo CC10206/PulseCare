@@ -213,7 +213,7 @@ function playAudio(path) {
       resolve();
     });
     audio.addEventListener("error", () => {
-      reject(new Error(`Unable to play ${path}. Please confirm this file exists under app/demo_assets/`));
+      reject(new Error(`Unable to play ${path}. Please confirm this file exists under web/demo_assets/`));
     });
     audio.play().catch(reject);
   });
@@ -280,7 +280,7 @@ async function fetchReport(filename) {
   const res = await fetch(ASSET_DIR + filename);
   if (!res.ok) {
     throw new Error(
-      `Failed to load ${filename} (HTTP ${res.status}). Please generate the assets under app/demo_assets/ first by following docs/demo-steps.md.`
+      `Failed to load ${filename} (HTTP ${res.status}). Please generate the assets under web/demo_assets/ first by following docs/demo-steps.md.`
     );
   }
   return res.json();

@@ -1,6 +1,6 @@
 # PulseCare — Phase 1：核心特徵管線
 
-Phase 1 驗收標準：`python recording_analysis/analyze.py sample.wav --transcribe --baseline baseline.json`
+Phase 1 驗收標準：`python -m pulsecare.cli.analyze sample.wav --transcribe --baseline fixtures/baseline.json`
 能印出 6 個聲學特徵、一段本地轉錄的逐字稿、一個 0–100 的活力指數。
 
 ---
@@ -11,8 +11,12 @@ Python 3.11 或 3.12（3.13 部分套件輪子還不齊，別用）。
 
 ```bash
 python3.12 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[server,dev]"
 ```
+
+相依以 `pyproject.toml` 的 extras 分層：`server`（OpenVINO 推論與 demo server）、
+`sensing`（邊緣節點，純 DSP，不含 OpenVINO）、`lexical`、`convert`（模型轉檔）、
+`dev`。邊緣節點只裝 `pip install -e ".[sensing]"`。
 
 Windows 上 `opensmile` 若安裝失敗，先裝 Visual C++ Build Tools。
 
@@ -97,7 +101,7 @@ ffmpeg -i raw.m4a -ar 16000 -ac 1 -c:a pcm_s16le normal.wav
 ## Step 3｜跑通聲學特徵 (30 分)
 
 ```bash
-python core/features.py normal.wav
+python -m pulsecare.sensing.features normal.wav
 ```
 
 六個特徵的意義：
@@ -120,7 +124,7 @@ python core/features.py normal.wav
 ## Step 4｜跑通本地轉錄 (30 分)
 
 ```bash
-python core/transcribe.py normal.wav
+python -m pulsecare.inference.transcribe normal.wav
 ```
 
 注意 OpenVINO GenAI 的 `return_timestamps=True` 給的是**片段級**時間戳，
@@ -135,9 +139,9 @@ python core/transcribe.py normal.wav
 ## Step 5｜建立基線並計分 (45 分)
 
 ```bash
-python recording_analysis/seed_baseline.py --from-wav normal.wav --days 14 -o baseline.json
-python recording_analysis/analyze.py normal.wav --keep-audio --baseline baseline.json   # 應接近 50
-python recording_analysis/analyze.py low.wav    --keep-audio --baseline baseline.json   # 應明顯低於 50
+python -m pulsecare.cli.seed_baseline --from-wav normal.wav --days 14 -o fixtures/baseline.json
+python -m pulsecare.cli.analyze normal.wav --keep-audio --baseline fixtures/baseline.json   # 應接近 50
+python -m pulsecare.cli.analyze low.wav    --keep-audio --baseline fixtures/baseline.json   # 應明顯低於 50
 ```
 
 `--keep-audio` 只在調試時用。正式流程不加這個旗標，音檔會在特徵抽取後立即刪除
@@ -148,7 +152,7 @@ python recording_analysis/analyze.py low.wav    --keep-audio --baseline baseline
 ## Step 6｜Phase 1 驗收 (30 分)
 
 ```bash
-python recording_analysis/analyze.py low.wav --transcribe --baseline baseline.json
+python -m pulsecare.cli.analyze low.wav --transcribe --baseline fixtures/baseline.json
 ```
 
 三個都要成立才算過關：
@@ -170,20 +174,20 @@ README 系統架構圖裡的「家屬/社工 App」畫面：一支手機比例�
 
 ```bash
 # 產生一份會真的觸發 yellow 的合成歷史（下滑趨勢，接的是真實 alert_level() 邏輯）
-python recording_analysis/seed_baseline.py --trend down --trend-end 30 -o baseline_down.json
-python recording_analysis/seed_baseline.py --trend flat -o baseline_flat.json
+python -m pulsecare.cli.seed_baseline --trend down --trend-end 30 -o fixtures/baseline_down.json
+python -m pulsecare.cli.seed_baseline --trend flat -o fixtures/baseline_flat.json
 
-python recording_analysis/analyze.py normal.wav --baseline baseline_flat.json --json app/green_example.json
-python recording_analysis/analyze.py low.wav    --baseline baseline_down.json --json app/yellow_example.json
+python -m pulsecare.cli.analyze normal.wav --baseline fixtures/baseline_flat.json --json web/green_example.json
+python -m pulsecare.cli.analyze low.wav    --baseline fixtures/baseline_down.json --json web/yellow_example.json
 
 python -m http.server
-# 瀏覽 http://localhost:8000/app/family_view.html?data=green_example.json
-# 瀏覽 http://localhost:8000/app/family_view.html?data=yellow_example.json
+# 瀏覽 http://localhost:8000/web/family_view.html?data=green_example.json
+# 瀏覽 http://localhost:8000/web/family_view.html?data=yellow_example.json
 ```
 
-在還沒有真實錄音檔可用時，`app/generate_examples.py` 會用手動指定的示意
+在還沒有真實錄音檔可用時，`pulsecare/cli/generate_examples.py` 會用手動指定的示意
 特徵值跑同一套真實計分邏輯（`build_baseline`/`vitality_index`/`build_report`），
-產生 `app/green_example.json`、`app/yellow_example.json` 讓網頁先開發/拍攝
+產生 `web/green_example.json`、`web/yellow_example.json` 讓網頁先開發/拍攝
 ——正式錄好 `normal.wav`/`low.wav` 後，請改用上面 `analyze.py --json` 的方式
 重新產生，取代這兩份示意檔。
 
@@ -200,7 +204,8 @@ python -m http.server
 
 **額外設置**（在 Phase 1 的 venv 之外，這三塊都是新的相依）：
 
-1. 麥克風 + VAD：`pip install sounddevice silero-vad torch`（已在 requirements.txt）。
+1. 麥克風 + VAD：`sounddevice` / `silero-vad` / `torch`（已在 `pyproject.toml`
+   的 `[sensing]` extra）。
 2. LLM 回應：把 `Qwen/Qwen2.5-1.5B-Instruct` 用跟 Whisper 一樣的方式轉檔——
    ```bash
    optimum-cli export openvino \
@@ -215,8 +220,8 @@ python -m http.server
    的匯出麻煩，遇到問題先查那份文件。
 
 ```bash
-python recording_analysis/seed_baseline.py --trend flat -o baseline.json
-python live_conversation/live_session.py --baseline baseline.json --json app/live_example.json
+python -m pulsecare.cli.seed_baseline --trend flat -o fixtures/baseline.json
+python -m pulsecare.cli.live_session --baseline fixtures/baseline.json --json web/live_example.json
 ```
 
 「排程器」不是真的 OS 層級排程——執行 `live_session.py` 本身就代表
@@ -230,26 +235,27 @@ python live_conversation/live_session.py --baseline baseline.json --json app/liv
 
 | 檔案 | 用途 |
 |---|---|
-| `core/feature_keys.py` | 6 個核心特徵的鍵名（獨立成檔，讓 `scoring.py` 不用裝 librosa/opensmile 就能測試） |
-| `core/features.py` | 聲學 + 詞彙特徵抽取 |
-| `core/scoring.py` | 個人基線、活力指數、燈號、可解釋性、App 報告組裝 |
-| `core/transcribe.py` | OpenVINO Whisper 本地轉錄 |
-| `recording_analysis/analyze.py` | Phase 1 主 CLI（吃一個現成 wav 檔） |
-| `recording_analysis/seed_baseline.py` | 產生合成基線（Demo 用），支援 `--trend flat/down/up` |
-| `app/family_view.html` | 家屬/社工 App 畫面（單頁網頁，讀 `--json` 輸出） |
-| `app/generate_examples.py` | 在沒有真實錄音時，產生 App 畫面的示意資料 |
-| `live_conversation/listen.py` | 麥克風錄音 + silero-vad 自動斷句 |
-| `live_conversation/llm_reply.py` | 本地小型 LLM 生成回應 (Qwen2.5 via OpenVINO GenAI) |
-| `live_conversation/tts.py` | 本地文字轉語音 (Qwen3-TTS via OpenVINO，設置見 `docs/tts-setup.md`) |
-| `live_conversation/qwen_3_tts_helper.py` | Qwen3-TTS 的 OpenVINO 推論 wrapper（外部相依，不進版控，見 `docs/tts-setup.md`） |
-| `live_conversation/live_session.py` | Phase 2 主 CLI，真的對著麥克風跑一輪完整對話 |
+| `pulsecare/contracts/feature_keys.py` | 6 個核心特徵的鍵名（獨立成檔，讓 `scoring.py` 不用裝 librosa/opensmile 就能測試） |
+| `pulsecare/sensing/features.py` | 聲學 + 詞彙特徵抽取 |
+| `pulsecare/scoring.py` | 個人基線、活力指數、燈號、可解釋性、App 報告組裝 |
+| `pulsecare/inference/transcribe.py` | OpenVINO Whisper 本地轉錄 |
+| `pulsecare/cli/analyze.py` | Phase 1 主 CLI（吃一個現成 wav 檔） |
+| `pulsecare/cli/seed_baseline.py` | 產生合成基線（Demo 用），支援 `--trend flat/down/up` |
+| `web/family_view.html` | 家屬/社工 App 畫面（單頁網頁，讀 `--json` 輸出） |
+| `pulsecare/cli/generate_examples.py` | 在沒有真實錄音時，產生 App 畫面的示意資料 |
+| `pulsecare/sensing/capture.py` | 麥克風錄音 + silero-vad 自動斷句 |
+| `pulsecare/inference/llm_reply.py` | 本地小型 LLM 生成回應 (Qwen2.5 via OpenVINO GenAI) |
+| `pulsecare/inference/tts.py` | 本地文字轉語音 (Qwen3-TTS via OpenVINO，設置見 `docs/tts-setup.md`) |
+| `pulsecare/inference/vendor/qwen_3_tts_helper.py` | Qwen3-TTS 的 OpenVINO 推論 wrapper（外部相依，不進版控，見 `docs/tts-setup.md`） |
+| `pulsecare/cli/live_session.py` | Phase 2 主 CLI，真的對著麥克風跑一輪完整對話 |
 | `test_*.py` | pytest 單元測試（跟被測模組放同一層資料夾，只測不需要硬體/模型的純邏輯部分） |
 | `docs/demo-steps.md` | Demo 影片拍攝腳本（分鏡、實測耗時與剪輯點、旁白要點、故障排除） |
 | `docs/tts-setup.md` | Qwen3-TTS 可行性驗證與轉檔步驟 |
 
-`core/` 是兩個 phase 共用的引擎，`recording_analysis/analyze.py` 與
-`live_conversation/live_session.py` 都直接 import 它裡面的模組；pytest 透過
-`pytest.ini` 的 `pythonpath` 設定讓三個資料夾互相看得到彼此。
+`pulsecare/sensing/` 與 `pulsecare/scoring.py` 是兩個 phase 共用的引擎，
+`pulsecare/cli/analyze.py` 與 `pulsecare/cli/live_session.py` 都直接 import 它們。
+相依方向一律由上往下（`cli` → `inference` → `scoring` → `sensing` → `contracts`），
+不可反向。pytest 設定在 `pyproject.toml` 的 `[tool.pytest.ini_options]`。
 
 ## 重要聲明
 

@@ -1,8 +1,8 @@
 import numpy as np
 import pytest
 
-from scoring import alert_level
-from seed_baseline import synthetic_trend
+from pulsecare.scoring import alert_level
+from pulsecare.cli.seed_baseline import synthetic_trend
 
 
 def test_synthetic_trend_flat_returns_constant_value():

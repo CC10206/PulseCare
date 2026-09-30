@@ -1,6 +1,6 @@
 import pytest
 
-from listen import EndOfTurnDetector, pick_input_device
+from pulsecare.sensing.capture import EndOfTurnDetector, pick_input_device
 
 
 def test_stops_when_end_event_received_after_start():

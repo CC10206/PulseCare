@@ -1,6 +1,6 @@
 import datetime
 
-from scoring import build_report
+from pulsecare.scoring import build_report
 
 
 def _sample_contribs():

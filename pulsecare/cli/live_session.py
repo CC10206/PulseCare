@@ -9,22 +9,19 @@ PulseCare — 即時對話迴路 (Phase 2)
 不在這支程式的範圍內。
 
 用法:
-    python live_conversation/live_session.py --baseline baseline.json --json app/live_example.json
+    python -m pulsecare.cli.live_session --baseline fixtures/baseline.json --json web/live_example.json
 """
 import argparse
 import json
 import os
-import sys
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
-
-from features import extract_features, lexical_features, FEATURE_KEYS
-from scoring import build_baseline, vitality_index, explain, alert_level, build_report
-import tts
-import llm_reply
-from listen import record_with_vad, save_wav
+from pulsecare.contracts.feature_keys import FEATURE_KEYS
+from pulsecare.sensing.features import extract_features, lexical_features
+from pulsecare.sensing.capture import record_with_vad, save_wav
+from pulsecare.scoring import build_baseline, vitality_index, explain, alert_level, build_report
+from pulsecare.inference import tts
+from pulsecare.inference import llm_reply
 
 GREETING = "李奶奶早！今天陽光很好，昨晚睡得好嗎？"
 
@@ -62,7 +59,7 @@ def main():
     for k in FEATURE_KEYS:
         print(f"  {k:<14} {feats[k]:>10.4f}")
 
-    from transcribe import transcribe
+    from pulsecare.inference.transcribe import transcribe
     t1 = time.time()
     tr = transcribe(wav_path, device=args.device)
     t_asr = time.time() - t1

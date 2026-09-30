@@ -22,9 +22,14 @@
 
 ## Step 1｜Clone Qwen3-TTS 原始碼
 
-`qwen_3_tts_helper.py` 放在 `live_conversation/`，但它會往上一層找 `Qwen3-TTS`
-子目錄，所以 Qwen3-TTS 原始碼要 clone 到**專案根目錄**（跟 `live_conversation/`
-同一層），不是跟 helper 檔案放一起：
+`qwen_3_tts_helper.py` 放在 `pulsecare/inference/vendor/`，Qwen3-TTS 原始碼則要
+clone 到**專案根目錄**，不是跟 helper 檔案放一起：
+
+> helper 內部有一行 `parent.parent / "Qwen3-TTS"` 的 `sys.path` 補丁，那是寫給
+> 它原本所在深度用的，搬進 `vendor/` 之後會指向不存在的位置。它是 vendored 檔
+> 不該修改（見 `CLAUDE.md`），所以改由 `pulsecare/inference/tts.py` 在載入前補上
+> 正確的專案根目錄路徑。照下面做過 `pip install -e Qwen3-TTS` 的話，那段補丁是
+> 多餘的但無害。
 
 ```bash
 git clone https://github.com/QwenLM/Qwen3-TTS.git
@@ -54,7 +59,7 @@ cd ..
 ./.venv/Scripts/python.exe -m pip install -q \
   "transformers==4.57.3" "accelerate==1.12.0" librosa soundfile sox onnxruntime einops
 
-curl -o live_conversation/qwen_3_tts_helper.py \
+curl -o pulsecare/inference/vendor/qwen_3_tts_helper.py \
   https://raw.githubusercontent.com/openvinotoolkit/openvino_notebooks/latest/notebooks/qwen3-tts/qwen_3_tts_helper.py
 ```
 
@@ -141,15 +146,15 @@ PYTHONUTF8=1 PYTHONIOENCODING=utf-8 ./.venv/Scripts/python.exe infer.py
   `torchaudio 2.11.0`），載入時會是 `OSError: [WinError 127] 找不到指定的
   程序`（原生擴充庫 ABI 不匹配）。**修法：明確裝
   `torchaudio==2.8.0`（同一個 `--extra-index-url .../whl/cpu`）。**
-  requirements.txt 已經把這個版本釘死。
+  `pyproject.toml` 的 `[sensing]` extra 已經把這個版本釘死。
 - 除了 Step 2 那份 pip 清單，`Qwen3-TTS` 的 import chain 實際上還需要
   `onnxruntime`、`einops`、`accelerate`（跑進 `speech_vq.py` 才會炸
-  `ModuleNotFoundError`，不會在裝套件當下就報錯，容易漏裝）。requirements.txt
-  已經補上。
+  `ModuleNotFoundError`，不會在裝套件當下就報錯，容易漏裝）。`pyproject.toml`
+  的 `[server]` extra 已經補上。
 - 把 `Qwen3-TTS/` clone 進專案根目錄後，裸執行 `pytest` 會連
   `Qwen3-TTS/examples/test_*.py` 一起收集，炸 `ModuleNotFoundError: qwen_tts`
-  （那是它自己的測試，不是我們的）。已加 `pytest.ini` 的
-  `norecursedirs = Qwen3-TTS .venv models` 排除掉。
+  （那是它自己的測試，不是我們的）。已在 `pyproject.toml` 的
+  `[tool.pytest.ini_options]` 用 `norecursedirs` 排除掉。
 
 ## 對整合進 `tts.py` 的建議
 

@@ -2,25 +2,22 @@
 PulseCare Phase 1 CLI
 
 用法:
-    python recording_analysis/analyze.py sample.wav                    # 只跑聲學特徵 (不需模型)
-    python recording_analysis/analyze.py sample.wav --transcribe       # 加上本地 Whisper 轉錄
-    python recording_analysis/analyze.py sample.wav --baseline base.json
-    python recording_analysis/analyze.py sample.wav --baseline base.json --json out.json --elder-name 李奶奶
+    python -m pulsecare.cli.analyze sample.wav                    # 只跑聲學特徵 (不需模型)
+    python -m pulsecare.cli.analyze sample.wav --transcribe       # 加上本地 Whisper 轉錄
+    python -m pulsecare.cli.analyze sample.wav --baseline base.json
+    python -m pulsecare.cli.analyze sample.wav --baseline base.json --json out.json --elder-name 李奶奶
 
 Phase 1 的驗收標準：這支程式能印出 6 個特徵 + 一個活力指數。
---json 額外輸出一份給家屬/社工 App 畫面用的結構化報告 (見 app/family_view.html)。
+--json 額外輸出一份給家屬/社工 App 畫面用的結構化報告 (見 web/family_view.html)。
 """
 import argparse
 import json
 import os
-import sys
 import time
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "core"))
-
-from features import extract_features, lexical_features, FEATURE_KEYS
-from scoring import build_baseline, vitality_index, explain, alert_level, build_report
+from pulsecare.contracts.feature_keys import FEATURE_KEYS
+from pulsecare.sensing.features import extract_features, lexical_features
+from pulsecare.scoring import build_baseline, vitality_index, explain, alert_level, build_report
 
 
 def main():
@@ -55,7 +52,7 @@ def main():
     lex = None
     transcript_text = None
     if args.transcribe:
-        from transcribe import transcribe
+        from pulsecare.inference.transcribe import transcribe
         t1 = time.time()
         tr = transcribe(args.wav, args.model_dir, args.device)
         t_asr = time.time() - t1

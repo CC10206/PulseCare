@@ -13,8 +13,8 @@
 - **相對個人基線，不是跨人比較。** 指數 50 = 這位長者自己的常態，用 median/MAD 而非
   mean/std 建立基線，對感冒、訪客、電視聲等離群值穩健。
 - **隱私優先，全程在本機推論。** 聲學特徵抽取、Whisper 轉錄、LLM 回應、TTS 合成都跑在本機
-  （OpenVINO），不上雲；[analyze.py](recording_analysis/analyze.py) 與
-  [live_session.py](live_conversation/live_session.py) 都在特徵抽取完成後立刻 `os.remove()`
+  （OpenVINO），不上雲；[analyze.py](pulsecare/cli/analyze.py) 與
+  [live_session.py](pulsecare/cli/live_session.py) 都在特徵抽取完成後立刻 `os.remove()`
   原始音檔。
 - **語速從聲學算，不從逐字稿算。** 用 `loudnessPeaksPerSec` 當語速代理，語言無關（台語、國語、
   客語都能算），也不受 ASR 準確率影響。
@@ -60,7 +60,23 @@ Python 3.11 或 3.12（3.13 部分套件輪子還不齊，別用）。
 
 ```bash
 python3.12 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[server,dev]"
+```
+
+相依以 [`pyproject.toml`](pyproject.toml) 的 extras 分層，依用途安裝：
+
+| extra | 用途 |
+|---|---|
+| `server` | 開發機／閘道器：OpenVINO 推論、Whisper、LLM、TTS、demo server |
+| `sensing` | 邊緣感測節點：只有純 DSP 特徵抽取，**不含 OpenVINO** |
+| `lexical` | 詞彙層（尚未實作） |
+| `convert` | 模型轉檔，建議裝在另一個 venv |
+| `dev` | pytest |
+
+邊緣節點（如 KNEO Pi，aarch64）只需要：
+
+```bash
+pip install -e ".[sensing]" --extra-index-url https://download.pytorch.org/whl/cpu
 ```
 
 > **venv 的路徑不能包含非 ASCII 字元**（例如中文）。`opensmile` 底層用 `ctypes` 把安裝路徑
@@ -75,29 +91,31 @@ Whisper（及 Phase 2 用到的 LLM／TTS）模型需另外用 `optimum-cli` 轉
 
 ## 使用方式
 
+所有入口都以模組執行（`python -m ...`），不要直接跑檔案路徑。
+
 只跑聲學特徵（不需模型）：
 
 ```bash
-python recording_analysis/analyze.py sample.wav
+python -m pulsecare.cli.analyze sample.wav
 ```
 
 加上本地 Whisper 轉錄：
 
 ```bash
-python recording_analysis/analyze.py sample.wav --transcribe
+python -m pulsecare.cli.analyze sample.wav --transcribe
 ```
 
 比對個人基線，算出活力指數與燈號，並輸出家屬/社工 App 用的結構化報告：
 
 ```bash
-python recording_analysis/seed_baseline.py --from-wav sample.wav --days 14 -o baseline.json
-python recording_analysis/analyze.py sample.wav --baseline baseline.json --json out.json --elder-name 李奶奶
+python -m pulsecare.cli.seed_baseline --from-wav sample.wav --days 14 -o fixtures/baseline.json
+python -m pulsecare.cli.analyze sample.wav --baseline fixtures/baseline.json --json out.json --elder-name 李奶奶
 ```
 
 Phase 2：真的對著麥克風跑一輪「問候 → 回答 → 分析 → AI 回應」：
 
 ```bash
-python live_conversation/live_session.py --baseline baseline.json --json app/live_example.json
+python -m pulsecare.cli.live_session --baseline fixtures/baseline.json --json web/live_example.json
 ```
 
 逐步教學、六項特徵的意義、驗收標準與故障排除見 **[`docs/plan.md`](docs/plan.md)**。
@@ -106,8 +124,8 @@ python live_conversation/live_session.py --baseline baseline.json --json app/liv
 
 | 頁面 | 對象 | 說明 |
 |---|---|---|
-| [`app/clinician_demo.html`](app/clinician_demo.html) | 心理師/評審 | 按一次「Start Demo」自動播完整流程的單頁介面，讀取預先算好的音檔＋報告 |
-| [`app/family_view.html`](app/family_view.html) | 家屬/社工 | 手機比例單頁：燈號卡片＋7 日趨勢圖＋柔性提示語 |
+| [`web/clinician_demo.html`](web/clinician_demo.html) | 心理師/評審 | 按一次「Start Demo」自動播完整流程的單頁介面，讀取預先算好的音檔＋報告 |
+| [`web/family_view.html`](web/family_view.html) | 家屬/社工 | 手機比例單頁：燈號卡片＋7 日趨勢圖＋柔性提示語 |
 
 兩個頁面都不呼叫任何 Python，只讀取事先用 `analyze.py --json` 產生的靜態素材，需搭配
 `python -m http.server` 以 `http://` 開啟（`file://` 會被同源政策擋掉）。完整拍攝腳本、
@@ -116,31 +134,47 @@ python live_conversation/live_session.py --baseline baseline.json --json app/liv
 ## 專案結構
 
 ```
-core/                聲學特徵、計分、轉錄——兩個 phase 共用的引擎
-recording_analysis/  Phase 1 主 CLI：吃一支現成 wav 檔
-live_conversation/   Phase 2：麥克風、VAD、本地 LLM、本地 TTS
-app/                 家屬/社工與心理師示範用的靜態網頁
-docs/                詳細步驟、拍攝腳本、TTS 可行性驗證記錄
+pulsecare/
+├── contracts/     跨層資料契約（特徵鍵名、SSE 事件階段、/ingest schema）
+├── sensing/       邊緣節點能跑的一切——純 DSP，不含 OpenVINO
+├── scoring.py     個人基線、活力指數、燈號、可解釋性、報告組裝
+├── inference/     OpenVINO 推論：Whisper / LLM / TTS（僅 server 端）
+├── lexical/       詞彙層（尚未實作）
+├── server/        demo server：SSE 事件流（尚未實作）
+└── cli/           命令列入口
+web/               靜態頁面 + 示範資料
+fixtures/          基線與錄音（不進版控）
+docs/              詳細步驟、拍攝腳本、設計規格
+models/            轉檔後的 OpenVINO IR（不進版控）
 ```
+
+相依方向一律由上往下：`cli` → `server` → `lexical`／`inference` → `scoring` →
+`sensing` → `contracts`，不可反向 import。
 
 | 檔案 | 用途 |
 |---|---|
-| `core/feature_keys.py` | 6 個核心特徵的鍵名（獨立成檔，讓 `scoring.py` 不用裝 librosa/opensmile 就能測試） |
-| `core/features.py` | 聲學 + 詞彙特徵抽取 |
-| `core/scoring.py` | 個人基線、活力指數、燈號、可解釋性、App 報告組裝 |
-| `core/transcribe.py` | OpenVINO Whisper 本地轉錄 |
-| `recording_analysis/analyze.py` | Phase 1 主 CLI |
-| `recording_analysis/seed_baseline.py` | 產生合成基線（Demo 用），支援 `--trend flat/down/up` |
-| `app/family_view.html` | 家屬/社工 App 畫面 |
-| `app/clinician_demo.html` | 心理師/評審用自動播放示範頁 |
-| `app/generate_examples.py` | 沒有真實錄音時，產生 App 畫面的示意資料 |
-| `live_conversation/listen.py` | 麥克風錄音 + silero-vad 自動斷句 |
-| `live_conversation/llm_reply.py` | 本地小型 LLM 生成回應（Qwen2.5 via OpenVINO GenAI） |
-| `live_conversation/tts.py` | 本地文字轉語音（Qwen3-TTS via OpenVINO，設置見 `docs/tts-setup.md`） |
-| `live_conversation/live_session.py` | Phase 2 主 CLI，真的對著麥克風跑一輪完整對話 |
+| `pulsecare/contracts/feature_keys.py` | 6 個核心特徵的鍵名（獨立成檔，讓 `scoring.py` 不用裝 opensmile 就能測試） |
+| `pulsecare/contracts/events.py` | SSE 事件階段契約：`/run` 與 `/replay` 必須發出相同序列 |
+| `pulsecare/contracts/ingest.py` | 邊緣節點回報特徵的 schema 與驗證 |
+| `pulsecare/sensing/features.py` | 聲學 + 詞彙特徵抽取 |
+| `pulsecare/sensing/capture.py` | 麥克風錄音 + silero-vad 自動斷句 |
+| `pulsecare/scoring.py` | 個人基線、活力指數、燈號、可解釋性、App 報告組裝 |
+| `pulsecare/inference/transcribe.py` | OpenVINO Whisper 本地轉錄 |
+| `pulsecare/inference/llm_reply.py` | 本地小型 LLM 生成回應（Qwen2.5 via OpenVINO GenAI） |
+| `pulsecare/inference/tts.py` | 本地文字轉語音（Qwen3-TTS via OpenVINO，設置見 `docs/tts-setup.md`） |
+| `pulsecare/cli/analyze.py` | Phase 1 主 CLI：吃一支現成 wav 檔 |
+| `pulsecare/cli/seed_baseline.py` | 產生合成基線（Demo 用），支援 `--trend flat/down/up` |
+| `pulsecare/cli/live_session.py` | Phase 2 主 CLI，真的對著麥克風跑一輪完整對話 |
+| `pulsecare/cli/generate_examples.py` | 沒有真實錄音時，產生 App 畫面的示意資料 |
+| `web/family_view.html` | 家屬/社工 App 畫面 |
+| `web/clinician_demo.html` | 心理師/評審用自動播放示範頁 |
 
-`core/` 是兩個 phase 共用的引擎，`pytest.ini` 的 `pythonpath` 讓 `core`／`recording_analysis`／
-`live_conversation` 三個資料夾互相看得到彼此，測試放在跟被測模組同一層資料夾。
+**邊緣相依隔離不是靠自律。** `[sensing]` extra 刻意不含 OpenVINO、librosa、
+parselmouth，而 `pulsecare/sensing/test_no_heavy_deps.py` 用靜態 AST 檢查把這條
+規則變成測試——有人在 `sensing/` 加一行重量級 import 就會被擋下來。
+
+測試放在跟被測模組同一層資料夾，設定在 `pyproject.toml` 的
+`[tool.pytest.ini_options]`。
 
 ## 測試
 
@@ -150,6 +184,7 @@ python -m pytest -q
 
 ## 文件索引
 
+- [`CLAUDE.md`](CLAUDE.md) — 開發約定、硬性約束（環境、隱私不變量、方法論不變量、誠實邊界）
 - [`docs/plan.md`](docs/plan.md) — 逐步環境建置、模型轉檔、六項特徵說明、驗收標準
 - [`docs/demo-steps.md`](docs/demo-steps.md) — Demo 影片拍攝腳本、分鏡時間軸、旁白要點、故障排除
 - [`docs/tts-setup.md`](docs/tts-setup.md) — Qwen3-TTS 可行性驗證與轉檔步驟

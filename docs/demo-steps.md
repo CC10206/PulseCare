@@ -1,6 +1,6 @@
 # Demo 拍攝步驟（預錄影片）
 
-**Demo 形式已改**：主體是 [`app/clinician_demo.html`](../app/clinician_demo.html)
+**Demo 形式已改**：主體是 [`web/clinician_demo.html`](../web/clinician_demo.html)
 ——一個按一次「Start Demo」就自動播完整個流程的單頁介面。以前那種「邊敲 CLI
 指令邊講旁白」的拍法已經退場，CLI 只剩下兩個角色：
 
@@ -42,19 +42,19 @@ python -c "import sounddevice as sd; print(sd.query_devices())"   # 只有 §3.3
 ```
 
 - [ ] pytest 22 passed
-- [ ] `app/demo_assets/` 底下五個檔案齊全（`greeting.wav`、`normal.wav`、`low.wav`、
+- [ ] `web/demo_assets/` 底下五個檔案齊全（`greeting.wav`、`normal.wav`、`low.wav`、
       `normal_report.json`、`low_report.json`）
 - [ ] `raw/normal.wav`、`raw/low.wav` 母帶已備份
 - [ ] 瀏覽器縮放設 100%、關掉擴充功能列與書籤列（頁面是深色系，畫面越乾淨越好）
 - [ ] 若要拍 §3.3：三個模型目錄都在、`Qwen3-TTS/` 與
-      `live_conversation/qwen_3_tts_helper.py` 都在、麥克風沒被其他程式獨占
+      `pulsecare/inference/vendor/qwen_3_tts_helper.py` 都在、麥克風沒被其他程式獨占
 
 ---
 
 ## 1｜素材準備（拍片前做完，不入鏡）
 
-這一節是整個 Demo 的關鍵路徑。[`app/clinician_demo.html`](../app/clinician_demo.html)
-**不呼叫任何 Python**，它只做兩件事：播放 `app/demo_assets/` 底下的音檔、讀取同一個
+這一節是整個 Demo 的關鍵路徑。[`web/clinician_demo.html`](../web/clinician_demo.html)
+**不呼叫任何 Python**，它只做兩件事：播放 `web/demo_assets/` 底下的音檔、讀取同一個
 資料夾底下預先算好的 JSON 報告。素材沒備齊，頁面就只會顯示錯誤訊息。
 
 ### 1.1 兩段錄音
@@ -89,34 +89,34 @@ mkdir -p raw && cp normal.wav low.wav raw/
 ```
 
 **`analyze.py` 預設會在特徵抽取後 `os.remove()` 掉輸入音檔**
-（[analyze.py:69-72](../recording_analysis/analyze.py#L69-L72)）。這是隱私設計、不是 bug，
+（[analyze.py:69-72](../pulsecare/cli/analyze.py#L69-L72)）。這是隱私設計、不是 bug，
 但也代表**每跑一次沒帶 `--keep-audio` 的指令就會少掉一個素材**。
 
 規矩：**每次都從 `raw/` 複製一份出來再跑**，不要直接對母帶下指令。
 
-### 1.3 產生 `app/demo_assets/` 的五個檔案
+### 1.3 產生 `web/demo_assets/` 的五個檔案
 
 從乾淨的 clone 開始，照順序跑完這一整段：
 
 ```bash
 # (a) 兩份合成基線：情境一用持平、情境二用下滑趨勢
-python recording_analysis/seed_baseline.py --trend flat -o baseline_flat.json
-python recording_analysis/seed_baseline.py --trend down --trend-end 30 -o baseline_down.json
+python -m pulsecare.cli.seed_baseline --trend flat -o fixtures/baseline_flat.json
+python -m pulsecare.cli.seed_baseline --trend down --trend-end 30 -o fixtures/baseline_down.json
 
 # (b) 資料夾要自己建 —— analyze.py 不會建，而且它在 .gitignore 裡
-mkdir -p app/demo_assets
+mkdir -p web/demo_assets
 
 # (c) 兩份報告（--transcribe 才會有逐字稿，報告卡上會顯示）
-cp raw/normal.wav . && python recording_analysis/analyze.py normal.wav --transcribe --baseline baseline_flat.json --json app/demo_assets/normal_report.json --elder-name 李奶奶 --keep-audio
-cp raw/low.wav .    && python recording_analysis/analyze.py low.wav    --transcribe --baseline baseline_down.json --json app/demo_assets/low_report.json  --elder-name 李奶奶 --keep-audio
+cp raw/normal.wav . && python -m pulsecare.cli.analyze normal.wav --transcribe --baseline fixtures/baseline_flat.json --json web/demo_assets/normal_report.json --elder-name 李奶奶 --keep-audio
+cp raw/low.wav .    && python -m pulsecare.cli.analyze low.wav    --transcribe --baseline fixtures/baseline_down.json --json web/demo_assets/low_report.json  --elder-name 李奶奶 --keep-audio
 
 # (d) 三個播放用音檔
-cp raw/normal.wav app/demo_assets/normal.wav
-cp raw/low.wav    app/demo_assets/low.wav
-cp <你錄的問候語> app/demo_assets/greeting.wav
+cp raw/normal.wav web/demo_assets/normal.wav
+cp raw/low.wav    web/demo_assets/low.wav
+cp <你錄的問候語> web/demo_assets/greeting.wav
 ```
 
-`app/demo_assets/` 整個資料夾都在 `.gitignore` 裡（跟其他原始音檔一樣不進版控），
+`web/demo_assets/` 整個資料夾都在 `.gitignore` 裡（跟其他原始音檔一樣不進版控），
 **每次在新機器上要錄影前都要重新跑一次這一段**。
 
 ### 1.4 還沒有真實錄音時的開發用素材
@@ -126,17 +126,17 @@ cp <你錄的問候語> app/demo_assets/greeting.wav
 
 ```bash
 # 兩份 JSON（用手動指定的示意特徵值跑同一套真實計分邏輯）
-python app/generate_examples.py
+python -m pulsecare.cli.generate_examples
 
 # 三個純音調占位 wav（generate_examples.py 不產生音檔）
 python -c "
 import numpy as np, soundfile as sf, os
-os.makedirs('app/demo_assets', exist_ok=True)
+os.makedirs('web/demo_assets', exist_ok=True)
 sr = 16000
 for name, freq, dur in [('greeting.wav', 440, 2.5), ('normal.wav', 523, 2.0), ('low.wav', 330, 2.0)]:
     t = np.linspace(0, dur, int(sr*dur), endpoint=False)
     tone = (0.2 * np.sin(2*np.pi*freq*t)).astype(np.float32)
-    sf.write(f'app/demo_assets/{name}', tone, sr)
+    sf.write(f'web/demo_assets/{name}', tone, sr)
     print('wrote', name)
 "
 ```
@@ -147,7 +147,7 @@ for name, freq, dur in [('greeting.wav', 440, 2.5), ('normal.wav', 523, 2.0), ('
 python -m http.server
 ```
 
-開 http://localhost:8000/app/clinician_demo.html ，點 Start Demo，
+開 http://localhost:8000/web/clinician_demo.html ，點 Start Demo，
 要能一路跑到「示範結束」而不出現任何錯誤訊息。**一定要走 `http://`**，
 `file://` 會被 fetch 的同源政策擋掉。
 
@@ -159,7 +159,7 @@ python -m http.server
 python -m http.server
 ```
 
-http://localhost:8000/app/clinician_demo.html → 點一次 Start Demo，之後**完全不需要
+http://localhost:8000/web/clinician_demo.html → 點一次 Start Demo，之後**完全不需要
 再碰鍵盤滑鼠**，整段是唯讀自動播放（刻意不放暫停／上一步，避免錄影時誤觸）。
 
 ### 播放時間軸
@@ -185,7 +185,7 @@ http://localhost:8000/app/clinician_demo.html → 點一次 Start Demo，之後*
 - **指數大字 + 燈號**：50 = 這位長者自己的常態。
 - **六項特徵雙向長條圖**：中線是個人基線，往左是偏離。
   顏色是依**顯著性**上色，不是依正負：`|z| < 0.8` 是灰色（正常波動），
-  `|z| >= 0.8` 才轉黃——門檻沿用 [`core/scoring.py`](../core/scoring.py) `explain()`
+  `|z| >= 0.8` 才轉黃——門檻沿用 [`pulsecare/scoring.py`](../pulsecare/scoring.py) `explain()`
   的判準。所以**情境一那張大部分是灰的才是對的**，不要以為沒渲染成功。
 - **逐字稿**：Whisper 本地轉錄的輸出（見 §6 的已知瑕疵）。
 - **對比摘要**：兩個指數並排 + 一句差異描述。這句話是**前端從兩份 JSON 的
@@ -222,7 +222,7 @@ http://localhost:8000/app/clinician_demo.html → 點一次 Start Demo，之後*
 ```bash
 cp raw/normal.wav _privacy_demo.wav
 ls _privacy_demo.wav
-python recording_analysis/analyze.py _privacy_demo.wav --baseline baseline_flat.json
+python -m pulsecare.cli.analyze _privacy_demo.wav --baseline fixtures/baseline_flat.json
 ls _privacy_demo.wav          # 檔案已不存在
 ```
 
@@ -230,8 +230,8 @@ ls _privacy_demo.wav          # 檔案已不存在
 用複製檔來演，不要拿母帶。
 
 也可以搭配編輯器鏡頭停在
-[analyze.py:69-72](../recording_analysis/analyze.py#L69-L72) 與
-[live_session.py:75-78](../live_conversation/live_session.py#L75-L78)
+[analyze.py:69-72](../pulsecare/cli/analyze.py#L69-L72) 與
+[live_session.py:75-78](../pulsecare/cli/live_session.py#L75-L78)
 這兩段 `os.remove`，講「離開這台機器的只有數值」。
 
 ### 3.2 家屬／社工 App 畫面
@@ -239,13 +239,13 @@ ls _privacy_demo.wav          # 檔案已不存在
 跟主場的心理師介面是**兩個不同對象**：這裡是家屬看的，語氣安撫、資訊精簡。
 
 ```bash
-cp raw/normal.wav . && python recording_analysis/analyze.py normal.wav --baseline baseline_flat.json --json app/green_example.json  --elder-name 李奶奶 --keep-audio
-cp raw/low.wav .    && python recording_analysis/analyze.py low.wav    --baseline baseline_down.json --json app/yellow_example.json --elder-name 李奶奶 --keep-audio
+cp raw/normal.wav . && python -m pulsecare.cli.analyze normal.wav --baseline fixtures/baseline_flat.json --json web/green_example.json  --elder-name 李奶奶 --keep-audio
+cp raw/low.wav .    && python -m pulsecare.cli.analyze low.wav    --baseline fixtures/baseline_down.json --json web/yellow_example.json --elder-name 李奶奶 --keep-audio
 python -m http.server
 ```
 
-- 綠燈 http://localhost:8000/app/family_view.html?data=green_example.json
-- 黃燈 http://localhost:8000/app/family_view.html?data=yellow_example.json
+- 綠燈 http://localhost:8000/web/family_view.html?data=green_example.json
+- 黃燈 http://localhost:8000/web/family_view.html?data=yellow_example.json
 
 手機比例單頁：燈號卡片 → 柔性提示語 → 近 7 日趨勢折線 → 系統觀察到的細節。
 
@@ -260,8 +260,8 @@ python -m http.server
 這是唯一「真的現場跑推論」的一段，也是唯一有長時間等待的一段（見 §4）。
 
 ```bash
-python recording_analysis/seed_baseline.py --trend flat -o baseline.json
-python live_conversation/live_session.py --baseline baseline.json --json app/live_example.json
+python -m pulsecare.cli.seed_baseline --trend flat -o fixtures/baseline.json
+python -m pulsecare.cli.live_session --baseline fixtures/baseline.json --json web/live_example.json
 ```
 
 1. `⏰ [排程觸發]` → TTS 念出問候語（喇叭出聲）
@@ -313,7 +313,7 @@ TTS 的等待剪掉，接成「問候 → 回答 → 分析 → AI 回應」的�
 - **基線用 median/MAD 而非 mean/std。** 對離群值穩健——感冒、家裡有訪客、
   電視聲都不會把基線帶歪。
 
-一定要講的免責（[scoring.py](../core/scoring.py) 的設計前提，也是提案的誠信基礎）：
+一定要講的免責（[scoring.py](../pulsecare/scoring.py) 的設計前提，也是提案的誠信基礎）：
 
 - 指數 50 = **這位長者自己的常態**，是相對個人基線的偏離度，不是跨人比較、
   更不是憂鬱症篩檢或臨床診斷。頁面上每張卡片都印著這句免責聲明。
@@ -330,7 +330,7 @@ TTS 的等待剪掉，接成「問候 → 回答 → 分析 → AI 回應」的�
 | 症狀 | 原因 | 解法 |
 |---|---|---|
 | 狀態列顯示「載入 normal_report.json 失敗」 | 沒跑 §1.3，或用 `file://` 開頁面 | 補跑 §1.3；一定要 `python -m http.server` 走 `http://` |
-| 狀態列顯示「無法播放 …greeting.wav」 | `app/demo_assets/` 缺音檔 | 補跑 §1.3 (d) 或 §1.4 的占位檔 |
+| 狀態列顯示「無法播放 …greeting.wav」 | `web/demo_assets/` 缺音檔 | 補跑 §1.3 (d) 或 §1.4 的占位檔 |
 | 點 Start Demo 沒聲音、波形不動 | 分頁被瀏覽器靜音，或系統輸出裝置選錯 | 檢查分頁靜音圖示與系統音量；波形一直線代表真的沒有訊號 |
 | 六條長條圖全是灰色 | **這是正常的**——偏離量絕對值小於 0.8 就是灰色 | 情境一（正常語氣）本來就該幾乎全灰 |
 | 對比摘要出現「低 **-**3.2 分」 | 情境二指數反而比情境一高 | 兩段錄音的表演差異不夠，重錄 `low.wav`；先不要調權重 |
@@ -340,7 +340,7 @@ TTS 的等待剪掉，接成「問候 → 回答 → 分析 → AI 回應」的�
 
 | 症狀 | 原因 | 解法 |
 |---|---|---|
-| `FileNotFoundError` 寫不進 `app/demo_assets/…json` | 資料夾不存在（gitignore 掉了，`analyze.py` 不會自己建） | 先 `mkdir -p app/demo_assets` |
+| `FileNotFoundError` 寫不進 `web/demo_assets/…json` | 資料夾不存在（gitignore 掉了，`analyze.py` 不會自己建） | 先 `mkdir -p web/demo_assets` |
 | `opensmile.Smile(...)` 丟 `UnicodeEncodeError` | venv 路徑含中文 | venv 必須建在純 ASCII 路徑（本機是 `C:\Users\user\pulsecare-venv`） |
 | `ModuleNotFoundError: No module named 'openvino_genai'` | 用到系統 python 而非 venv | 先跑 `Activate.ps1` |
 | `音檔太短 (x.xs)` | 音檔不足 3 秒 | `features.py` 的下限，重錄 |
@@ -348,7 +348,7 @@ TTS 的等待剪掉，接成「問候 → 回答 → 分析 → AI 回應」的�
 | `UnicodeEncodeError` 在 import 階段就炸 | 主控台 cp950，TTS helper import 時 print emoji | `$env:PYTHONUTF8=1; $env:PYTHONIOENCODING="utf-8"` |
 | `OSError: [WinError 127]` | `torchaudio` 與 `torch` 版本不匹配 | 兩者都釘 `2.8.0`，走 `--extra-index-url .../whl/cpu` |
 | 錄音 5 秒後報「沒有收到任何錄音資料」 | 麥克風被其他程式獨占，或選到沒有輸入聲道的裝置 | 關掉 Teams/OBS 獨占模式；`pick_input_device()` 會自動退回第一個有輸入聲道的裝置 |
-| 錄滿 20 秒都沒停 | VAD 沒偵測到語音（音量太小／選錯裝置） | 檢查系統輸入音量，或用 `python live_conversation/listen.py test.wav` 單獨測錄音 |
+| 錄滿 20 秒都沒停 | VAD 沒偵測到語音（音量太小／選錯裝置） | 檢查系統輸入音量，或用 `python -m pulsecare.sensing.capture test.wav` 單獨測錄音 |
 | `family_view.html` 顯示「載入失敗」 | 用 `file://` 直接開 | 一定要 `python -m http.server` 再走 `http://localhost:8000/...` |
 
 ### 兩個已知的畫面瑕疵
@@ -356,9 +356,9 @@ TTS 的等待剪掉，接成「問候 → 回答 → 分析 → AI 回應」的�
 1. **Whisper 會輸出簡體字。** 實測 `whisper-small` 轉出「今天**阳光**很好，昨晚睡得好**吗**？」。
    在新的形式下這件事**更嚴重了**——逐字稿現在是報告卡上的固定區塊，會停在畫面上好幾秒，
    不像以前只是終端機一閃而過。建議在
-   [`transcribe.py`](../core/transcribe.py) 加一層 `opencc` 簡轉繁再輸出
+   [`transcribe.py`](../pulsecare/inference/transcribe.py) 加一層 `opencc` 簡轉繁再輸出
    （這是字形轉換，不是竄改內容）。
-2. **LLM 回應偏長。** [`llm_reply.py`](../live_conversation/llm_reply.py) 的 system prompt
+2. **LLM 回應偏長。** [`llm_reply.py`](../pulsecare/inference/llm_reply.py) 的 system prompt
    要求「只用一到兩句」，實測會生出四句、約 80 字。除了不合設計，還會讓 TTS 的合成
    時間等比拉長（80 字 ≈ 20 秒語音 ≈ 150 秒合成）。只影響 §3.3，拍那一段之前可考慮把
    `max_new_tokens` 從 60 再調低。

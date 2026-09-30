@@ -9,8 +9,6 @@ import librosa
 import parselmouth
 import opensmile
 
-from feature_keys import FEATURE_KEYS
-
 # eGeMAPSv02 = 情感運算領域的標準最小特徵集 (88 維)
 # 用標準特徵集而非自創特徵，是為了讓評審/心理師能對照既有文獻
 _SMILE = opensmile.Smile(

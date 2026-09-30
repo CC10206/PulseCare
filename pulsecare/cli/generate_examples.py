@@ -1,30 +1,29 @@
 """
-產生 app/green_example.json 與 app/yellow_example.json，
+產生 web/green_example.json 與 web/yellow_example.json，
 供 family_view.html 在拍攝/開發時使用。
 
-⚠️ 這裡的「今天」特徵值是手動指定的示意數字，不是真的錄音跑出來的
-（本機沒有裝 librosa/opensmile，見 README 的環境設置）。但計分邏輯
+注意：這裡的「今天」特徵值是手動指定的示意數字，不是真的錄音跑出來的
+（在沒裝 opensmile 的環境也能執行，見 README 的環境設置）。但計分邏輯
 (build_baseline / vitality_index / alert_level / build_report) 全部是
 analyze.py 實際會呼叫的同一套真實程式碼，不是另外編的假資料。
 
 正式錄好 normal.wav / low.wav 後，改用：
-    python recording_analysis/analyze.py normal.wav --baseline baseline_flat.json  --json app/green_example.json
-    python recording_analysis/analyze.py low.wav    --baseline baseline_down.json  --json app/yellow_example.json
+    python -m pulsecare.cli.analyze normal.wav --baseline fixtures/baseline_flat.json --json web/green_example.json
+    python -m pulsecare.cli.analyze low.wav    --baseline fixtures/baseline_down.json --json web/yellow_example.json
 取代這支腳本產生的範例檔。
 """
 import json
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
 
-_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_ROOT / "core"))
-sys.path.insert(0, str(_ROOT / "recording_analysis"))
+from pulsecare.scoring import build_baseline, vitality_index, alert_level, build_report
+from pulsecare.cli.seed_baseline import TYPICAL, JITTER, synthetic_trend
 
-from scoring import build_baseline, vitality_index, alert_level, build_report
-from seed_baseline import TYPICAL, JITTER, synthetic_trend
+#: 靜態頁面資料夾。這支腳本住在 pulsecare/cli/，輸出卻要落在 web/，
+#: 所以不能用 os.path.dirname(__file__)。
+WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 
 # 依 scoring.DIRECTION 的方向、對 TYPICAL 做約 1.5 個標準單位的示意「低落
 # 語氣」偏移 (刻意不用滿分 -3 的極端值，避免看起來像數值溢位而非真實分布)
@@ -61,7 +60,7 @@ def _build(today_feats: dict, history: list[dict], elder_name: str,
 
 
 def main():
-    out_dir = os.path.dirname(__file__)
+    out_dir = str(WEB_DIR)
     demo_assets_dir = os.path.join(out_dir, "demo_assets")
     os.makedirs(demo_assets_dir, exist_ok=True)
 
